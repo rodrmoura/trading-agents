@@ -9,13 +9,20 @@ Active backlog for the Tauric VS Code LLM integration and generalized agent coll
 - [x] Record the two-project roadmap: Tauric VS Code LLM integration first vertical slice, generalized agent collaboration platform second track.
 - [x] Add initial architecture docs, ADRs, Copilot instructions, and session lifecycle skills.
 - [x] Adapt a reusable structure-only governance model into this project.
-- [ ] Review and commit the initial governance documentation when the user is ready.
+- [x] Review, commit, and push the initial governance documentation.
 - [x] Choose exact GitHub repo owner, names, and visibility: public `rodrmoura/trading-agents` for the integration repo; create the generalized platform repo later.
 - [x] Choose fork or private standalone mirror for the TradingAgents integration repo: named public fork.
 - [x] Create the TradingAgents integration repo.
 - [x] Rename current `origin` remote to `upstream` and add our integration repo as `origin`.
 - [x] Disable local pushes to the upstream TauricResearch remote.
-- [ ] Push the initial governance commit to the integration repo.
+- [x] Push the initial governance commit to the integration repo.
+- [x] Create the initial document/code scaffold.
+- [x] Add roadmap, reference drafts, and runbooks for the next implementation pass.
+- [x] Decide first gateway API direction: native minimal API first, OpenAI-compatible facade later.
+- [x] Decide generalized platform repo timing: after the TradingAgents gateway vertical slice works here.
+- [x] Decide first non-finance workflow: product strategy review.
+- [x] Decide control room timing: defer until event contracts exist.
+- [x] Review and commit the initial document/code scaffold.
 
 ## Project 1: Tauric VS Code LLM Integration
 
@@ -34,6 +41,7 @@ Active backlog for the Tauric VS Code LLM integration and generalized agent coll
 
 ## Project 2: Generalized Agent Collaboration Platform
 
+- [x] Choose the first non-finance workflow to prove genericity: product strategy review.
 - [ ] Define agent manifest schema.
 - [ ] Define workflow graph schema.
 - [ ] Define tool registry and permission model.
@@ -54,8 +62,6 @@ Active backlog for the Tauric VS Code LLM integration and generalized agent coll
 
 ## Open Questions
 
-- Should the gateway expose OpenAI-compatible endpoints, native endpoints, or both at first?
 - Should app-specific tools execute in Python, the VS Code extension, or a hybrid loop?
-- Should the first frontend be a VS Code webview or a standalone browser app?
-- What is the first non-finance workflow we want to prove after TradingAgents?
-- What exact names should we use for the two GitHub repositories?
+- What exact name should we use for the future generalized platform repository?
+- Should the gateway remain extension-only, or eventually use a separate local service?

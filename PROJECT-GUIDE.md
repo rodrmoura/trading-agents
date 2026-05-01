@@ -38,14 +38,14 @@ Any change that affects product scope, architecture, upstream boundary policy, V
 
 > Last updated: 2026-05-01
 
-- **Upstream clone:** Done. `TauricResearch/TradingAgents` is cloned locally and still clean apart from our uncommitted governance additions.
+- **Upstream clone:** Done. `TauricResearch/TradingAgents` is cloned locally, our fork is configured as `origin`, and upstream push is disabled locally.
 - **Repository understanding:** Done. The TradingAgents architecture, CLI, LLM provider layer, data tools, memory log, checkpointing, tests, and Docker setup have been reviewed.
 - **Project direction:** Drafted. The work is split into Tauric VS Code LLM integration and the generalized agent collaboration platform.
 - **Repository strategy:** Active. `rodrmoura/trading-agents` is the public TradingAgents integration fork; `TauricResearch/TradingAgents` is preserved as `upstream` with local push disabled. The generalized platform repository will be created later when reusable code starts.
-- **Governance docs:** In progress. Root source-of-truth docs, ADRs, Copilot instructions, and session lifecycle skills are being established.
+- **Governance docs:** Baseline committed and pushed. The initial document/code scaffold, roadmap, reference drafts, and runbooks are ready for the next implementation pass.
 - **VS Code model gateway:** Not started. No extension or gateway code exists yet.
 - **TradingAgents VS Code provider:** Not started. No code changes have been made inside upstream-derived TradingAgents files.
-- **Generic agent framework:** Not started. Current work is planning and governance only.
+- **Generalized agent collaboration platform:** Not started. Current work is planning and governance only.
 - **Frontend control room:** Not started. Long-term target only.
 
 ---
@@ -58,7 +58,7 @@ The immediate goal is to let TradingAgents use the language models available ins
 
 The long-term goal is a generic agent ecosystem with reusable agents, tools, workflows, memory, checkpoints, human approvals, and a frontend control room.
 
-## 2. Phase Boundaries
+## 2. Project Boundaries
 
 ### Project 1: Tauric VS Code LLM Integration
 
@@ -85,6 +85,14 @@ Project 1 deliverables:
 - Structured-output compatibility for decision agents.
 - Tool-calling compatibility for analyst agents.
 
+Project 1 success criteria:
+
+- TradingAgents can run one end-to-end analysis through VS Code-provided models.
+- The integration does not require direct model provider API keys for the LLM path.
+- The gateway can stream responses, fail clearly, and stop cleanly.
+- TradingAgents upstream-derived code changes are limited to provider/adapter boundaries.
+- The gateway and SDK remain reusable by a second non-TradingAgents app.
+
 ### Project 2: Generalized Agent Collaboration Platform
 
 Build a manifest-driven multi-agent runtime that can support TradingAgents-like collaboration in other domains.
@@ -100,7 +108,30 @@ Project 2 deliverables:
 - Frontend control room for goals, agents, runs, artifacts, approvals, and memory.
 - TradingAgents packaged as a finance workflow template.
 
-## 3. Repository Strategy
+Project 2 success criteria:
+
+- At least one non-finance workflow runs through the generalized runtime.
+- Agents are configured through manifests, not hardcoded Python teams.
+- Tools, memory, artifacts, checkpoints, and event logs have explicit contracts.
+- A frontend can observe a run without depending on TradingAgents internals.
+- TradingAgents can be represented as one workflow template instead of the platform core.
+
+## 3. First Vertical Slice
+
+The first implementation slice should prove the smallest useful loop:
+
+```text
+VS Code extension starts local gateway
+  -> Python SDK lists/selects a VS Code model
+  -> TradingAgents uses provider = "vscode"
+  -> one ticker analysis runs through the existing graph
+  -> structured decision output is returned
+  -> logs show gateway/model errors clearly
+```
+
+This slice intentionally excludes the generalized runtime and frontend control room. Those start after the gateway path works against a real TradingAgents run.
+
+## 4. Repository Strategy
 
 Use two GitHub repositories, matching the two-project split.
 
@@ -138,15 +169,17 @@ This repository should not import TradingAgents internals. TradingAgents can bec
 3. Create the generalized platform repo only when we start extracting reusable gateway/runtime code.
 4. Move reusable code from the integration repo to the platform repo when it is no longer TradingAgents-specific.
 
-## 4. Non-Goals
+## 5. Non-Goals
 
 - Do not build live brokerage or real trade execution unless explicitly scoped later.
 - Do not rewrite TradingAgents into a generic framework before the VS Code gateway works.
 - Do not make generic runtime packages depend on TradingAgents internals.
 - Do not store secrets, local gateway tokens, provider API keys, or generated caches in the repository.
 - Do not modify upstream-derived files casually.
+- Do not create the generalized platform repository until reusable code is ready to move or start there.
+- Do not build a frontend before the gateway/runtime contracts are clear enough to visualize.
 
-## 5. Architecture Principles
+## 6. Architecture Principles
 
 - Always reason about the work as two projects in one: the Tauric VS Code LLM integration and the generalized agent collaboration platform.
 - TradingAgents is the first integrated ecosystem, not the foundation of every future abstraction.
@@ -157,13 +190,29 @@ This repository should not import TradingAgents internals. TradingAgents can bec
 - The frontend should visualize collaboration, tool calls, artifacts, memory, disagreements, and human approvals.
 - Upstream syncs should be explicit and separate from feature work.
 
-## 6. Intended Repository Shape
+## 7. Decision Backlog
+
+Resolved decisions from the current planning pass:
+
+- Gateway API shape: native minimal API first; add OpenAI-compatible facade later if useful.
+- Platform repo timing: create the generalized platform repo after the TradingAgents gateway vertical slice works here.
+- First non-finance workflow: product strategy review.
+- Control room timing: defer UI until event contracts exist.
+
+Open decisions that should be resolved before implementation goes far:
+
+- Gateway packaging: VS Code extension only, or extension plus separate local service later.
+- Tool execution boundary: app process, extension process, or hybrid.
+- Future platform repo name and initial package ownership.
+
+## 8. Intended Repository Shape
 
 Near term inside this clone:
 
 ```text
 .github/                    # Copilot instructions and lifecycle skills
 docs/                       # Architecture notes, ADRs, and guidance
+examples/                   # Local examples and future demo workflows
 packages/                   # Future generic gateway/runtime packages
 apps/                       # Future app/adapters/frontend
 prompts/                    # Future extracted and generic prompts
@@ -173,7 +222,7 @@ cli/                        # Upstream-derived TradingAgents CLI
 
 Long term, the generalized platform should live in its own repository. The TradingAgents integration repository should either remain a fork/mirror or become a thin integration app that consumes the platform.
 
-## 7. Update Rules
+## 9. Update Rules
 
 - Update `TODO.md` whenever task state changes.
 - Add or update an ADR in `docs/decisions/` for durable decisions with meaningful alternatives.

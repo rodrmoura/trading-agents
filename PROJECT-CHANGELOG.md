@@ -14,3 +14,6 @@ The upstream `CHANGELOG.md` remains the TauricResearch/TradingAgents release his
 - Explicit two-project governance rule separating the Tauric VS Code LLM integration from the generalized agent collaboration platform.
 - Two-repository strategy for a TradingAgents integration repo plus a separate generalized agent collaboration platform repo.
 - Public integration fork created at `rodrmoura/trading-agents`; local remotes set to `origin` for the fork and `upstream` for TauricResearch/TradingAgents with upstream push disabled.
+- Initial document and code scaffold for `apps/`, `packages/`, `prompts/`, `examples/`, `docs/runbooks/`, and `docs/reference/`.
+- Roadmap, gateway API draft, agent manifest draft, upstream-sync runbook, and documentation-validation runbook.
+- Planning decisions recorded: native minimal gateway API first, platform repo after TradingAgents vertical slice, product strategy review as first generic workflow, and control room deferred until event contracts exist.

@@ -22,7 +22,8 @@ The integration can depend on the platform, but the platform should not depend o
 | `packages/agent-runtime/` | Ours | Generic workflow runtime. No TradingAgents imports. |
 | `apps/tradingagents-adapter/` | Ours | May depend on both generic packages and TradingAgents. |
 | `prompts/upstream-tradingagents/` | Mixed | Extracted/adapted TradingAgents prompts with provenance. |
-| `docs/` | Ours | Architecture, decisions, and guidance. |
+| `examples/` | Ours | Safe local examples and future demo workflows. |
+| `docs/` | Ours | Architecture, decisions, guidance, runbooks, and reference material. |
 
 These folders do not all exist yet. They define the intended boundaries as the project grows.
 
@@ -48,14 +49,14 @@ TradingAgents core -> generic runtime internals
 
 ## Upstream Update Strategy
 
-When we create our own GitHub repo or fork for the TradingAgents integration, use this remote layout:
+The TradingAgents integration fork uses this remote layout:
 
 ```text
-origin   -> our repo/fork
+origin   -> https://github.com/rodrmoura/trading-agents.git
 upstream -> https://github.com/TauricResearch/TradingAgents
 ```
 
-The current clone still has `origin` pointing at TauricResearch/TradingAgents. Before pushing our work, rename that remote to `upstream` and add our new GitHub repository as `origin`.
+Local upstream push is disabled to reduce accidental pushes to TauricResearch/TradingAgents.
 
 Preferred sync flow:
 

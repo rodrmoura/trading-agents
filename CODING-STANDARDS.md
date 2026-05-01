@@ -35,6 +35,8 @@ Expected packages:
 - `packages/agent-runtime/`
 - `packages/agent-schemas/`
 
+Package manifests should not be added until implementation starts. Placeholder README scaffolds are acceptable for ownership and planning.
+
 ## Python Standards
 
 - Follow the style already present in TradingAgents for upstream-derived patches.
@@ -68,6 +70,7 @@ For documentation-only changes:
 - `git diff --check`
 - markdown diagnostics when available
 - non-ASCII scan when the touched docs are expected to remain ASCII
+- follow [docs/runbooks/docs-validation.md](docs/runbooks/docs-validation.md)
 
 For Python changes:
 

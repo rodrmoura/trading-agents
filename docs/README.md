@@ -14,7 +14,9 @@ The project has two tracks:
 - [Documentation Governance](../DOCS-GOVERNANCE.md)
 - [Project Vision](architecture/project-vision.md)
 - [Code Governance](architecture/code-governance.md)
+- [Repository Layout](architecture/repository-layout.md)
 - [Repository Strategy](architecture/repository-strategy.md)
+- [Roadmap](architecture/roadmap.md)
 - [Copilot and Skills Guidance](guidance/copilot-and-skills.md)
 - [Session Lifecycle Skills](../.github/skills/README.md)
 
@@ -26,10 +28,22 @@ The project has two tracks:
 - [0004: Two-Repository Strategy](decisions/0004-two-repository-strategy.md)
 - [ADR Template](decisions/ADR-TEMPLATE.md)
 
+## Reference Drafts
+
+- [Gateway API Draft](reference/gateway-api-draft.md)
+- [Agent Manifest Draft](reference/agent-manifest-draft.md)
+
+## Runbooks
+
+- [Documentation Validation](runbooks/docs-validation.md)
+- [Upstream Sync](runbooks/upstream-sync.md)
+
 ## Documentation Rules
 
 - Record durable decisions in `docs/decisions/`.
 - Record working guidance in `docs/guidance/`.
+- Record operational procedures in `docs/runbooks/`.
+- Record stable contracts and inventories in `docs/reference/`.
 - Use [Project Guide](../PROJECT-GUIDE.md) as the source of truth for product and architecture direction.
 - Use [Documentation Governance](../DOCS-GOVERNANCE.md) to decide which files to update.
 - Keep upstream-derived TradingAgents changes documented in [Code Governance](architecture/code-governance.md) until we add a dedicated patch log.

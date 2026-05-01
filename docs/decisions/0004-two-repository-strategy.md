@@ -23,7 +23,7 @@ The first project needs to stay close to the upstream TradingAgents repository. 
 
 Use two repositories.
 
-The first repository will track TauricResearch/TradingAgents and hold our integration work. The second repository will be created when reusable platform code begins and will hold the generalized agent collaboration platform.
+The first repository will track TauricResearch/TradingAgents and hold our integration work. The second repository will be created after the TradingAgents gateway vertical slice works here and reusable code is ready to extract or start cleanly.
 
 ## Consequences
 

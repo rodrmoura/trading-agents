@@ -48,10 +48,7 @@ apps/tradingagents-adapter/    # Optional adapter app
 
 Documentation-only changes:
 
-```powershell
-git diff --check
-rg -n '[^\x00-\x7F]' .github docs PROJECT-GUIDE.md TODO.md DOCS-GOVERNANCE.md CODING-STANDARDS.md SECURITY.md DEPLOY.md CONTRIBUTING.md PROJECT-CHANGELOG.md
-```
+Use [docs/runbooks/docs-validation.md](docs/runbooks/docs-validation.md).
 
 Python changes:
 

@@ -32,17 +32,19 @@ The project guide wins on product and architecture. This file wins on documentat
 | Decisions | `docs/decisions/*.md` | Records durable choices, tradeoffs, consequences, and revisit triggers |
 | Architecture notes | `docs/architecture/*.md` | Explains active architecture and project structure |
 | Guidance | `docs/guidance/*.md` | Captures working practices such as Copilot and skill usage |
+| Runbooks | `docs/runbooks/*.md` | Captures operational procedures and repeatable workflows |
+| Reference | `docs/reference/*.md` | Captures stable contracts, schemas, inventories, and API references |
 | History | `PROJECT-CHANGELOG.md` | Tracks notable local platform changes |
 
 ## Update Triggers
 
 Update documentation in the same change when work affects any of these areas:
 
-- Product scope, project boundaries, platform goals, frontend vision, or launch criteria: update `PROJECT-GUIDE.md` and `TODO.md`.
+- Product scope, project boundaries, platform goals, frontend vision, roadmap, success criteria, or launch criteria: update `PROJECT-GUIDE.md`, `TODO.md`, and `docs/architecture/roadmap.md` when milestones change.
 - Upstream boundary, fork/subtree strategy, folder ownership, or dependency direction: update `PROJECT-GUIDE.md`, `DOCS-GOVERNANCE.md`, and `docs/architecture/code-governance.md`.
-- VS Code gateway API, auth token model, model selection, streaming, tool calling, or structured output: update `PROJECT-GUIDE.md`, `TODO.md`, `SECURITY.md`, `DEPLOY.md`, and an ADR when the decision is durable.
+- VS Code gateway API, auth token model, model selection, streaming, tool calling, or structured output: update `PROJECT-GUIDE.md`, `TODO.md`, `SECURITY.md`, `DEPLOY.md`, `docs/reference/` when contracts are stable, and an ADR when the decision is durable.
 - Generic agent runtime, manifest schema, tool registry, memory, checkpoints, or workflow graph model: update `PROJECT-GUIDE.md`, `TODO.md`, `CODING-STANDARDS.md`, and an ADR.
-- Local setup, extension packaging, Python SDK installation, environment variables, service URLs, or developer commands: update `README.md`, `DEPLOY.md`, `.env.example` if relevant, and `TODO.md`.
+- Local setup, extension packaging, Python SDK installation, environment variables, service URLs, or developer commands: update `README.md`, `DEPLOY.md`, `docs/runbooks/` when the workflow is repeatable, `.env.example` if relevant, and `TODO.md`.
 - Agent workflow, slash command, skill, or Copilot behavior: update `.github/copilot-instructions.md`, `.github/skills/README.md`, the relevant skill, `docs/guidance/copilot-and-skills.md`, `TODO.md`, and `PROJECT-CHANGELOG.md`.
 - Repository-visible changes future sessions should remember: update `PROJECT-CHANGELOG.md` under `[Unreleased]`.
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -12,7 +12,9 @@ TradingAgents is Python-based and currently uses LangChain model clients. Future
 
 ## Decision
 
-Build a reusable VS Code extension that exposes a localhost-only model gateway. Local apps call the gateway through a small SDK or OpenAI-compatible endpoint. The extension calls the VS Code Language Model API.
+Build a reusable VS Code extension that exposes a localhost-only model gateway. Local apps call the gateway through a small SDK. The extension calls the VS Code Language Model API.
+
+Start with a native minimal API. Add an OpenAI-compatible facade later if it helps adoption after the first TradingAgents vertical slice works.
 
 Initial target shape:
 
@@ -35,7 +37,6 @@ local app
 
 ## Open Questions
 
-- Should the first public API be OpenAI-compatible, native gateway-specific, or both?
 - Should app-specific tools execute in the app process, the extension process, or both?
 - How should model selection be represented when VS Code model identifiers change over time?
-- Should the extension include a frontend control room, or should the control room be a separate app?
+- The control room is deferred until event contracts exist. The later UI surface is still undecided.
