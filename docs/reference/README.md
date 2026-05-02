@@ -14,4 +14,5 @@ Future reference docs may include:
 Current drafts:
 
 - [Gateway API Draft](gateway-api-draft.md)
+- [TradingAgents VS Code Provider Audit](tradingagents-vscode-provider-audit.md)
 - [Agent Manifest Draft](agent-manifest-draft.md)

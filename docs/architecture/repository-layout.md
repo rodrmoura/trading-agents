@@ -5,7 +5,7 @@ This repository is the TradingAgents integration repo. It contains upstream-deri
 ## Top-Level Layout
 
 ```text
-.github/                    # Copilot instructions and session lifecycle skills
+.github/                    # Copilot instructions, callable agents, prompt wrappers, and workflow skills
 apps/                       # App-level integration shells and future UI prototypes
 assets/                     # Upstream TradingAgents assets
 cli/                        # Upstream-derived TradingAgents CLI
@@ -23,6 +23,15 @@ tradingagents/              # Upstream-derived TradingAgents Python package
 ```text
 docs/
   README.md
+  WORKFLOW_HELPERS.md
+  DECISIONS.md
+  EXPERIMENT_LOG.md
+  CHANGELOG.md
+  ROADMAP.md
+  repo_state/
+    ACTIVE_STATE.md
+    PROVEN_KNOWLEDGE.md
+  session_capsules/
   architecture/
     code-governance.md
     project-vision.md
@@ -36,6 +45,12 @@ docs/
     0004-two-repository-strategy.md
   guidance/
     copilot-and-skills.md
+  planning/
+    README.md
+    execution-plan.md
+    gates.md
+    codex-task-packets.md
+    documentation-map.md
   reference/
     README.md
   runbooks/

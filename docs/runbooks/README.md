@@ -13,4 +13,5 @@ Future runbooks may include:
 Current runbooks:
 
 - [Documentation Validation](docs-validation.md)
+- [Gateway G1 Smoke](gateway-g1-smoke.md)
 - [Upstream Sync](upstream-sync.md)

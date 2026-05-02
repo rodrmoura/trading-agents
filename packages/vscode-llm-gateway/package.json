@@ -1,0 +1,72 @@
+{
+  "name": "vscode-llm-gateway",
+  "displayName": "TradingAgents VS Code LLM Gateway",
+  "description": "VS Code extension skeleton for the TradingAgents local model gateway.",
+  "version": "0.0.1",
+  "publisher": "tauric",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:tradingAgentsGateway.start",
+    "onCommand:tradingAgentsGateway.stop",
+    "onCommand:tradingAgentsGateway.status",
+    "onCommand:tradingAgentsGateway.copyToken"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "tradingAgentsGateway.start",
+        "title": "Start",
+        "category": "TradingAgents Gateway"
+      },
+      {
+        "command": "tradingAgentsGateway.stop",
+        "title": "Stop",
+        "category": "TradingAgents Gateway"
+      },
+      {
+        "command": "tradingAgentsGateway.status",
+        "title": "Status",
+        "category": "TradingAgents Gateway"
+      },
+      {
+        "command": "tradingAgentsGateway.copyToken",
+        "title": "Copy Token",
+        "category": "TradingAgents Gateway"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "tradingAgentsGateway.start"
+        },
+        {
+          "command": "tradingAgentsGateway.stop"
+        },
+        {
+          "command": "tradingAgentsGateway.status"
+        },
+        {
+          "command": "tradingAgentsGateway.copyToken"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "check": "tsc --noEmit -p ./",
+    "test": "npm run compile && node --test tests/*.test.mjs",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.57",
+    "@types/vscode": "^1.95.0",
+    "typescript": "^5.6.3"
+  }
+}

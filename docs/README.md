@@ -12,13 +12,29 @@ The project has two tracks:
 - [Project Guide](../PROJECT-GUIDE.md)
 - [TODO](../TODO.md)
 - [Documentation Governance](../DOCS-GOVERNANCE.md)
+- [Workflow Helpers](WORKFLOW_HELPERS.md)
+- [Active State](repo_state/ACTIVE_STATE.md)
+- [Proven Knowledge](repo_state/PROVEN_KNOWLEDGE.md)
+- [Governance Decisions](DECISIONS.md)
+- [Experiment Log](EXPERIMENT_LOG.md)
+- [Governance Changelog](CHANGELOG.md)
+- [Governance Roadmap](ROADMAP.md)
 - [Project Vision](architecture/project-vision.md)
 - [Code Governance](architecture/code-governance.md)
 - [Repository Layout](architecture/repository-layout.md)
 - [Repository Strategy](architecture/repository-strategy.md)
 - [Roadmap](architecture/roadmap.md)
 - [Copilot and Skills Guidance](guidance/copilot-and-skills.md)
+- [Custom Agents](../.github/agents/README.md)
+- [Prompt Wrappers](../.github/prompts)
 - [Session Lifecycle Skills](../.github/skills/README.md)
+
+## Planning
+
+- [Execution Plan](planning/execution-plan.md)
+- [Gate Checklist](planning/gates.md)
+- [Codex Task Packets](planning/codex-task-packets.md)
+- [Documentation Map](planning/documentation-map.md)
 
 ## Architecture Decision Records
 
@@ -41,7 +57,13 @@ The project has two tracks:
 ## Documentation Rules
 
 - Record durable decisions in `docs/decisions/`.
+- Record governance/workflow decisions in `docs/DECISIONS.md`.
+- Record current truth in `docs/repo_state/ACTIVE_STATE.md` and `docs/repo_state/PROVEN_KNOWLEDGE.md`.
+- Record workflow contracts in `docs/WORKFLOW_HELPERS.md`.
+- Record validation and experiment evidence in `docs/EXPERIMENT_LOG.md`.
+- Record historical governance handoff in `docs/CHANGELOG.md`.
 - Record working guidance in `docs/guidance/`.
+- Record execution plans, gates, and model-ready task packets in `docs/planning/`.
 - Record operational procedures in `docs/runbooks/`.
 - Record stable contracts and inventories in `docs/reference/`.
 - Use [Project Guide](../PROJECT-GUIDE.md) as the source of truth for product and architecture direction.

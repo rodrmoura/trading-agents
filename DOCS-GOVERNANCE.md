@@ -1,80 +1,61 @@
 # Documentation Governance
 
-Documentation is part of the engineering system for this project. It preserves decisions, keeps upstream-derived TradingAgents work separate from our generic platform work, and makes future sessions resumable from the repository itself.
+Documentation is part of the engineering system. It preserves current truth, durable decisions, validation evidence, and handoff context without creating duplicate sources of truth.
 
-## Source Of Truth Order
+## Canonical Governance Files
 
-When documents conflict, resolve them in this order:
+| File | Owns |
+| --- | --- |
+| `docs/WORKFLOW_HELPERS.md` | AI-agent workflow, model ownership, ledgers, review gates, lifecycle commands, and task triage |
+| `.github/copilot-instructions.md` | Always-on repository behavior summary that points to canonical governance |
+| `.github/instructions/documentation-system.instructions.md` | File-scoped documentation rules for `docs/**/*.md` |
+| `.github/instructions/model-routing.instructions.md` | Always-on model ownership routing summary |
+| `.github/agents/*.agent.md` | Callable role agents |
+| `.github/prompts/*.prompt.md` | Thin slash-command prompt wrappers |
+| `.github/skills/*/SKILL.md` | Slash-command workflow wrappers |
 
-1. [PROJECT-GUIDE.md](PROJECT-GUIDE.md) - product scope, end goal, project boundaries, architecture direction, and launch constraints.
-2. [TODO.md](TODO.md) - active implementation backlog and honest done/partial/not-done state.
-3. [DOCS-GOVERNANCE.md](DOCS-GOVERNANCE.md) - documentation ownership, routing, update triggers, and drift control.
-4. [docs/decisions](docs/decisions) - durable architecture and product decisions.
-5. [CODING-STANDARDS.md](CODING-STANDARDS.md) - code, testing, integration, and boundary rules.
-6. [SECURITY.md](SECURITY.md) - secrets, gateway access, model access, and data-handling rules.
-7. [DEPLOY.md](DEPLOY.md) - local setup, gateway operation, package, and release runbooks.
-8. [docs/architecture](docs/architecture) and [docs/guidance](docs/guidance) - supporting architecture and working guidance.
-9. [.github/copilot-instructions.md](.github/copilot-instructions.md) and [.github/skills](.github/skills) - agent guidance and lifecycle commands.
-10. [README.md](README.md) - upstream TradingAgents summary and user-facing quick start.
-11. [PROJECT-CHANGELOG.md](PROJECT-CHANGELOG.md) - notable repository-visible changes for our local platform work.
+## Current Truth And History
 
-The project guide wins on product and architecture. This file wins on documentation routing and maintenance rules.
-
-## Document Classes
-
-| Class | Files | Purpose |
+| File | Owns | Default Resume Input |
 | --- | --- | --- |
-| Product truth | `PROJECT-GUIDE.md` | Defines what we are building and why |
-| Planning | `TODO.md` | Tracks active work, done, partial, blocked, and next |
-| Governance | `DOCS-GOVERNANCE.md`, `CONTRIBUTING.md`, `.github/copilot-instructions.md`, `.github/skills/**` | Controls how work and agents stay aligned |
-| Engineering rules | `CODING-STANDARDS.md`, `SECURITY.md` | Defines safe implementation patterns |
-| Operations | `README.md`, `DEPLOY.md`, `.env.example` | Helps run, test, package, and operate the app/gateway |
-| Decisions | `docs/decisions/*.md` | Records durable choices, tradeoffs, consequences, and revisit triggers |
-| Architecture notes | `docs/architecture/*.md` | Explains active architecture and project structure |
-| Guidance | `docs/guidance/*.md` | Captures working practices such as Copilot and skill usage |
-| Runbooks | `docs/runbooks/*.md` | Captures operational procedures and repeatable workflows |
-| Reference | `docs/reference/*.md` | Captures stable contracts, schemas, inventories, and API references |
-| History | `PROJECT-CHANGELOG.md` | Tracks notable local platform changes |
+| `docs/repo_state/ACTIVE_STATE.md` | Current focus, mode, blockers, evidence snapshot, next actions, resume pointers | Yes |
+| `docs/repo_state/PROVEN_KNOWLEDGE.md` | Durable current priors, stable facts, reopen rules, contested knowledge | Yes |
+| `docs/DECISIONS.md` | Final governance and workflow decisions with rollback criteria | When decisions matter |
+| `docs/EXPERIMENT_LOG.md` | Validation, benchmark, experiment, and readiness evidence | When evidence matters |
+| `docs/CHANGELOG.md` | Historical session timeline between wraps | No |
+| `docs/session_capsules/*.md` | Dense long-form handoff for complex sessions | Only when ACTIVE_STATE points to one |
+| `docs/ROADMAP.md` | Medium-term priorities and parked work | Only when priority is unclear |
+
+## Existing Project Docs
+
+Existing project-specific docs remain valid when they own project scope, architecture, operations, or implementation plans. They should point to the canonical governance files instead of duplicating workflow rules.
+
+Examples:
+
+- `PROJECT-GUIDE.md`: project and architecture source of truth.
+- `TODO.md`: active backlog.
+- `CODING-STANDARDS.md`: implementation conventions.
+- `SECURITY.md`: security rules.
+- `DEPLOY.md`: setup and operation notes.
+- `docs/architecture/**`: project architecture notes.
+- `docs/planning/**`: project execution plans and task packets.
+- `docs/decisions/**`: architecture decision records.
+
+## Rules
+
+- One fact gets one home.
+- Use pointers instead of duplicating long rules.
+- Resolve current truth first in `ACTIVE_STATE` and `PROVEN_KNOWLEDGE` when docs disagree.
+- Do not store secrets, tokens, credentials, `.env` values, generated caches, or private local data in docs.
+- Do not update historical docs from `/state-sync`; use `/session-wrap` for durable historical handoff.
+- Do not read `docs/CHANGELOG.md` by default during resume.
 
 ## Update Triggers
 
-Update documentation in the same change when work affects any of these areas:
-
-- Product scope, project boundaries, platform goals, frontend vision, roadmap, success criteria, or launch criteria: update `PROJECT-GUIDE.md`, `TODO.md`, and `docs/architecture/roadmap.md` when milestones change.
-- Upstream boundary, fork/subtree strategy, folder ownership, or dependency direction: update `PROJECT-GUIDE.md`, `DOCS-GOVERNANCE.md`, and `docs/architecture/code-governance.md`.
-- VS Code gateway API, auth token model, model selection, streaming, tool calling, or structured output: update `PROJECT-GUIDE.md`, `TODO.md`, `SECURITY.md`, `DEPLOY.md`, `docs/reference/` when contracts are stable, and an ADR when the decision is durable.
-- Generic agent runtime, manifest schema, tool registry, memory, checkpoints, or workflow graph model: update `PROJECT-GUIDE.md`, `TODO.md`, `CODING-STANDARDS.md`, and an ADR.
-- Local setup, extension packaging, Python SDK installation, environment variables, service URLs, or developer commands: update `README.md`, `DEPLOY.md`, `docs/runbooks/` when the workflow is repeatable, `.env.example` if relevant, and `TODO.md`.
-- Agent workflow, slash command, skill, or Copilot behavior: update `.github/copilot-instructions.md`, `.github/skills/README.md`, the relevant skill, `docs/guidance/copilot-and-skills.md`, `TODO.md`, and `PROJECT-CHANGELOG.md`.
-- Repository-visible changes future sessions should remember: update `PROJECT-CHANGELOG.md` under `[Unreleased]`.
-
-## Writing Rules
-
-- Prefer one canonical source over duplicated prose. Link or summarize from lower-priority docs.
-- Mark status honestly: done only after verification, partial when implementation exists but readiness is incomplete, blocked when a decision or dependency is missing.
-- Keep docs concise. Do not paste chat transcripts or noisy command output.
-- Do not store secrets, `.env` values, gateway tokens, provider keys, credentials, customer data, or generated local caches in markdown.
-- Keep upstream TradingAgents release notes separate from our local platform history.
-- Use ADRs for durable choices with meaningful alternatives.
-
-## Lifecycle Commands
-
-Use the workspace skills as the documentation maintenance workflow:
-
-- `/session-resume`: read docs, fetch/pull safely, and present next steps. It should not edit docs.
-- `/state-sync`: lightweight in-progress checkpoint. It may update `TODO.md`, `PROJECT-CHANGELOG.md`, and related docs, but must not pull or commit.
-- `/session-wrap`: final session closure. It must perform final markdown sync, validate, review staged paths, and commit when appropriate.
-
-See [.github/skills/README.md](.github/skills/README.md) for the lifecycle matrix.
-
-## Review Checklist
-
-Before finishing a documentation-impacting change:
-
-- Did `PROJECT-GUIDE.md` remain the source of truth for product and architecture?
-- Did `TODO.md` reflect actual done, partial, blocked, and next work?
-- Did `PROJECT-CHANGELOG.md` capture notable local platform changes without noise?
-- Did setup or operations changes update `README.md`, `DEPLOY.md`, and `.env.example` as needed?
-- Did security or gateway-access changes update `SECURITY.md` or `CODING-STANDARDS.md`?
-- Did durable decisions get an ADR?
-- Did touched markdown pass diagnostics and `git diff --check`?
+- Workflow, agent, prompt, skill, routing, review, or ledger behavior changed: update `docs/WORKFLOW_HELPERS.md` and the relevant `.github/**` wrapper.
+- Current focus, blockers, evidence, or next actions changed: update `docs/repo_state/ACTIVE_STATE.md`.
+- Durable current priors changed: update `docs/repo_state/PROVEN_KNOWLEDGE.md`.
+- Final governance/workflow decision changed: update `docs/DECISIONS.md`.
+- Validation or experiment evidence changed materially: update `docs/EXPERIMENT_LOG.md`.
+- Historical session handoff is needed: update `docs/CHANGELOG.md` and, for complex sessions, `docs/session_capsules/`.
+- Product or project architecture changed: update the existing project-specific source of truth and add pointers here only when governance ownership changes.

@@ -2,9 +2,11 @@
 
 This roadmap keeps the two projects moving together without collapsing them into one rewrite.
 
+Detailed execution tasks live in [../planning/execution-plan.md](../planning/execution-plan.md). Gate criteria live in [../planning/gates.md](../planning/gates.md). Coding-model task packets live in [../planning/codex-task-packets.md](../planning/codex-task-packets.md).
+
 ## Milestone 0: Governance And Structure
 
-Status: in progress.
+Status: in progress. The remaining gate item is committing the latest model-routing customization and planning docs.
 
 Exit criteria:
 
@@ -18,6 +20,8 @@ Exit criteria:
 Goal: prove that a VS Code extension can expose a local model gateway safely.
 
 API direction: native minimal API first. Add an OpenAI-compatible facade later only after the native path proves the VS Code model loop.
+
+Packaging direction: extension-only for the first gateway spike. App-specific tools run in the Python app/runtime, not in the extension.
 
 Exit criteria:
 
@@ -66,6 +70,8 @@ Exit criteria:
 ## Milestone 5: Generalized Runtime Prototype
 
 Goal: run one non-finance workflow through the generalized runtime.
+
+Planned future repository name: `agent-collaboration-platform`.
 
 Exit criteria:
 

@@ -25,6 +25,8 @@ Use two repositories.
 
 The first repository will track TauricResearch/TradingAgents and hold our integration work. The second repository will be created after the TradingAgents gateway vertical slice works here and reusable code is ready to extract or start cleanly.
 
+The planned name for the second repository is `agent-collaboration-platform`.
+
 ## Consequences
 
 - Upstream TradingAgents updates stay easier to receive and review.

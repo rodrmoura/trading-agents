@@ -21,14 +21,17 @@ When project documents conflict, use this order:
 
 1. `PROJECT-GUIDE.md` - product scope, end goal, architecture direction, project boundaries, and launch constraints.
 2. `TODO.md` - active implementation backlog translated from this guide.
-3. `DOCS-GOVERNANCE.md` - documentation ownership, routing, update triggers, and drift control.
-4. `docs/decisions/` - durable architecture and product decisions with rationale and consequences.
-5. `CODING-STANDARDS.md` - code, testing, integration, and boundary rules.
-6. `SECURITY.md` and `DEPLOY.md` - security and operations runbooks.
-7. `docs/architecture/` and `docs/guidance/` - supporting architecture and working guidance.
-8. `.github/copilot-instructions.md` and `.github/skills/` - agent behavior and lifecycle commands.
-9. `README.md` - upstream TradingAgents overview and user-facing quick start.
-10. `PROJECT-CHANGELOG.md` - notable repository-visible changes for our local platform work.
+3. `docs/repo_state/ACTIVE_STATE.md` and `docs/repo_state/PROVEN_KNOWLEDGE.md` - current truth for resume and handoff.
+4. `docs/WORKFLOW_HELPERS.md` - AI-agent governance, routing, ledgers, review gates, and lifecycle commands.
+5. `DOCS-GOVERNANCE.md` - documentation ownership, routing, update triggers, and drift control.
+6. `docs/DECISIONS.md` and `docs/decisions/` - final governance decisions and architecture ADRs.
+7. `docs/planning/` - execution plan, gates, model-ready task packets, and documentation map.
+8. `CODING-STANDARDS.md` - code, testing, integration, and boundary rules.
+9. `SECURITY.md` and `DEPLOY.md` - security and operations runbooks.
+10. `docs/architecture/` and `docs/guidance/` - supporting architecture and working guidance.
+11. `.github/copilot-instructions.md`, `.github/agents/`, `.github/prompts/`, and `.github/skills/` - assistant behavior, callable agents, prompt wrappers, and lifecycle commands.
+12. `README.md` - upstream TradingAgents overview and user-facing quick start.
+13. `docs/CHANGELOG.md` - governance session history between wraps.
 
 The upstream `CHANGELOG.md` belongs to TauricResearch/TradingAgents. Do not use it for our local platform governance notes unless we intentionally contribute upstream.
 
@@ -42,7 +45,7 @@ Any change that affects product scope, architecture, upstream boundary policy, V
 - **Repository understanding:** Done. The TradingAgents architecture, CLI, LLM provider layer, data tools, memory log, checkpointing, tests, and Docker setup have been reviewed.
 - **Project direction:** Drafted. The work is split into Tauric VS Code LLM integration and the generalized agent collaboration platform.
 - **Repository strategy:** Active. `rodrmoura/trading-agents` is the public TradingAgents integration fork; `TauricResearch/TradingAgents` is preserved as `upstream` with local push disabled. The generalized platform repository will be created later when reusable code starts.
-- **Governance docs:** Baseline committed and pushed. The initial document/code scaffold, roadmap, reference drafts, and runbooks are ready for the next implementation pass.
+- **Governance docs:** Baseline committed and pushed. A repository-local AI-agent governance bootstrap is in progress with canonical workflow helpers, current-truth state files, role agents, prompt wrappers, and lifecycle skills.
 - **VS Code model gateway:** Not started. No extension or gateway code exists yet.
 - **TradingAgents VS Code provider:** Not started. No code changes have been made inside upstream-derived TradingAgents files.
 - **Generalized agent collaboration platform:** Not started. Current work is planning and governance only.
@@ -195,22 +198,25 @@ This repository should not import TradingAgents internals. TradingAgents can bec
 Resolved decisions from the current planning pass:
 
 - Gateway API shape: native minimal API first; add OpenAI-compatible facade later if useful.
+- Gateway packaging: extension-only for the Phase 1 spike.
+- Tool execution boundary: app-specific tools run in the Python app/runtime, not in the VS Code gateway extension.
 - Platform repo timing: create the generalized platform repo after the TradingAgents gateway vertical slice works here.
+- Platform repo name: `agent-collaboration-platform`.
+- Callable agent workflow: use Reasoning Engineer for planning/ledgers, Codex Coding Engineer for one ready ledger at a time, and PhD Critic for read-only review.
 - First non-finance workflow: product strategy review.
 - Control room timing: defer UI until event contracts exist.
 
 Open decisions that should be resolved before implementation goes far:
 
-- Gateway packaging: VS Code extension only, or extension plus separate local service later.
-- Tool execution boundary: app process, extension process, or hybrid.
-- Future platform repo name and initial package ownership.
+- How should model selection be represented when VS Code model identifiers change over time?
+- What initial package ownership should move into `agent-collaboration-platform` after Phase 3?
 
 ## 8. Intended Repository Shape
 
 Near term inside this clone:
 
 ```text
-.github/                    # Copilot instructions and lifecycle skills
+.github/                    # Copilot instructions, agents, prompts, and lifecycle skills
 docs/                       # Architecture notes, ADRs, and guidance
 examples/                   # Local examples and future demo workflows
 packages/                   # Future generic gateway/runtime packages
@@ -225,9 +231,13 @@ Long term, the generalized platform should live in its own repository. The Tradi
 ## 9. Update Rules
 
 - Update `TODO.md` whenever task state changes.
+- Update `docs/repo_state/ACTIVE_STATE.md` whenever current focus, blockers, evidence, or next actions change.
+- Update `docs/repo_state/PROVEN_KNOWLEDGE.md` whenever durable current priors change.
+- Update `docs/WORKFLOW_HELPERS.md` whenever governance workflow, ledger, lifecycle, or review rules change.
 - Add or update an ADR in `docs/decisions/` for durable decisions with meaningful alternatives.
 - Update `DOCS-GOVERNANCE.md` when documentation routing or lifecycle command behavior changes.
 - Update `CODING-STANDARDS.md` when implementation conventions change.
 - Update `SECURITY.md` when gateway auth, secrets, model access, or data handling rules change.
 - Update `DEPLOY.md` when local setup, packaging, gateway operation, or release flow changes.
-- Update `PROJECT-CHANGELOG.md` for notable local platform changes.
+- Update `docs/CHANGELOG.md` for historical governance handoff when using session wrap.
+- Update `docs/planning/` when execution phases, gates, task packets, dependencies, or document ownership change.
