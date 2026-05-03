@@ -16,11 +16,12 @@ This file owns medium-term governance priorities and parked work. Product-specif
 - Treat P3.3a direct TradingAgents `vscode` provider smoke/runbook as complete and review-approved.
 - Treat P3.3b mocked non-stream native tool-call roundtrip as complete and review-approved.
 - Treat P3.3c full-graph smoke harness readiness and live full-graph smoke proof as complete.
+- Treat P3.4 structured-output adapter compatibility as complete and review-approved.
 
 ## Next
 
 - Keep using the phase execution queue in `docs/planning/codex-task-packets.md` for handoffs.
-- Plan the next `vscode` provider slice: structured-output compatibility or explicit free-text fallback acceptance criteria for downstream decision nodes.
+- Decide whether to run a live post-P3.4 full-graph smoke for downstream decision nodes before moving to the next `vscode` provider slice.
 
 ## Later
 

@@ -1233,10 +1233,10 @@ def test_readme_reflects_current_client_scope() -> None:
 
     stale_phrase = "health`, `list_models`, and `chat` methods intentionally raise"
     assert stale_phrase not in readme
-    assert "Current P3.3b scope" in readme
+    assert "Current P3.4 scope" in readme
     assert "synchronous native SSE streaming" in readme
     assert "llm_gateway.langchain_adapter.GatewayChatModel" in readme
-    assert "with_structured_output(...)` raises `NotImplementedError`" in readme
+    assert "with_structured_output(...)` supports non-streaming parser-level structured output" in readme
     assert "bind_tools(tools)` supports non-streaming native tool-call roundtrips" in readme
     assert "Tool-enabled streaming is not supported yet" in readme
 

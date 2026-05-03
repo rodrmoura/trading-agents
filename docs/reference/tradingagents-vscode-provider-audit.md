@@ -86,7 +86,7 @@ Do not pretend empty tool results are supported.
 
 ### Structured Output
 
-Trader, Research Manager, and Portfolio Manager use `with_structured_output(...)` through `tradingagents/agents/utils/structured.py`. The current gateway adapter raises `NotImplementedError`, and the structured helper catches that at agent creation and falls back to free-text generation. This is degraded behavior, not an immediate provider construction blocker.
+Trader, Research Manager, and Portfolio Manager use `with_structured_output(...)` through `tradingagents/agents/utils/structured.py`. At audit time, the gateway adapter raised `NotImplementedError`, and the structured helper caught that at agent creation and fell back to free-text generation. Current adapter behavior is recorded in `docs/repo_state/PROVEN_KNOWLEDGE.md`.
 
 P3.2 tests should confirm free-text fallback still works for `vscode`-backed LLM objects. Later G3 work should decide whether free text is acceptable for the first smoke or whether native structured output must be added first.
 

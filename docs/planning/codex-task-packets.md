@@ -44,6 +44,7 @@ Use this table as the planning index. The detailed packet sections below remain 
 | 3 | P3.3a | Add direct provider smoke script and runbook | P3.2 | Completed this session; implementation and review approved |
 | 3 | P3.3b | Implement native non-stream tool-call roundtrip | P3.3a | Completed this session; implementation and review approved |
 | 3 | P3.3c | Prove live one-ticker TradingAgents smoke path | P3.3b plus running VS Code gateway/model | Completed this session; live proof passed with free-text structured-output fallback |
+| 3 | P3.4 | Add structured-output adapter compatibility | P3.3b native tool-call bridge | Completed this session; implementation and review approved |
 | 4 | P4.1 | Formalize agent and workflow schemas | G3 passed | Planned |
 | 4 | P4.2 | Define tool, event, artifact, memory, and checkpoint contracts | P4.1 | Planned |
 | 4 | P4.3 | Create product strategy review example | P4.1/P4.2 | Planned |
@@ -1155,7 +1156,7 @@ Validation:
 
 ### P3.3c Prove Live One-Ticker TradingAgents Smoke Path
 
-Status: completed this session; harness readiness and live proof passed. Downstream structured-output support remains future work because the live proof used the documented free-text fallback.
+Status: completed this session; harness readiness and live proof passed. Downstream structured-output support was future work at P3.3c completion because the live proof used the documented free-text fallback.
 
 Model: Codex coding model extra-high.
 
@@ -1194,7 +1195,7 @@ Completion evidence:
 - Direct provider construction and direct invoke smoke both passed.
 - Full graph: `NVDA`, `2024-05-10`, analyst `market`, processed decision `Hold`.
 - Checked field counts: `market_report=4401`, `investment_plan=1497`, `trader_investment_plan=480`, `final_trade_decision=1117`.
-- Research Manager, Trader, and Portfolio Manager used the documented free-text fallback because `with_structured_output(...)` remains unsupported by `llm_gateway`.
+- Research Manager, Trader, and Portfolio Manager used the documented free-text fallback because `with_structured_output(...)` was unsupported by `llm_gateway` at P3.3c time.
 
 Validation:
 
@@ -1202,6 +1203,28 @@ Validation:
 - documented live smoke evidence for completion of P3.3c live proof
 - full root pytest if resources allow after code changes
 - `git diff --check`
+
+### P3.4 Structured-Output Adapter Compatibility
+
+Status: completed this session; local validation passed; implementation review approved.
+
+Model: Codex coding model extra-high.
+
+Objective: enable `GatewayChatModel.with_structured_output(...)` for non-streaming adapter calls by delegating to LangChain Core's tool-call parser path over the existing native gateway `tools`/`toolCalls` bridge.
+
+Acceptance evidence:
+
+- Pydantic schemas parse native `GatewayToolCall` input into Pydantic instances.
+- Dict/JSON schemas parse matching native tool-call input into dicts.
+- `include_raw=True` returns LangChain Core's `raw`/`parsed`/`parsing_error` shape for success and parser-error cases.
+- Captured adapter requests contain native `tools` only; no tool-choice enforcement field, OpenAI facade fields, HTTP `response_format`, or LangChain internal structured-output metadata is forwarded.
+- Explicit unsupported generation kwargs, stop sequences, tool-enabled streaming, named/required/explicit-any `bind_tools()` tool choice, and arbitrary unsupported `bind_tools()` kwargs remain rejected.
+
+Validation:
+
+- `c:/VSCode/Tauric/TradingAgents/.venv/Scripts/python.exe -m pytest -q packages/llm-gateway-python/tests/test_langchain_adapter.py packages/llm-gateway-python/tests/test_sdk_skeleton.py` (`94 passed`)
+- `c:/VSCode/Tauric/TradingAgents/.venv/Scripts/python.exe -m pytest -q tests/test_structured_agents.py tests/test_vscode_tradingagents_graph_smoke_script.py tests/test_vscode_provider_boundary.py` (`47 passed`)
+- PhD Critic implementation review approved the P3.4 diff with no blocking findings; optional follow-ups are an explicit `with_structured_output(...).stream(...)` adapter test and a note/test guarding LangChain Core's internal `ls_structured_output_format` metadata behavior.
 
 ## Phase 4 Packets: Generalized Contracts
 

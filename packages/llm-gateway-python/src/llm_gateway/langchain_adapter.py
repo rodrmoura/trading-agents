@@ -106,17 +106,6 @@ class GatewayChatModel(BaseChatModel):
             else:
                 raise GatewayConfigurationError("Unsupported native stream event from gateway client.")
 
-    def with_structured_output(
-        self,
-        schema: dict[str, Any] | type,
-        *,
-        include_raw: bool = False,
-        **kwargs: Any,
-    ) -> object:
-        raise NotImplementedError(
-            "Structured output is not supported by llm_gateway yet; use free-text generation."
-        )
-
     def bind_tools(
         self,
         tools: Sequence[object],
@@ -124,7 +113,9 @@ class GatewayChatModel(BaseChatModel):
         tool_choice: str | None = None,
         **kwargs: Any,
     ) -> object:
-        _reject_tool_choice(tool_choice)
+        allow_any_tool_choice = "ls_structured_output_format" in kwargs
+        kwargs.pop("ls_structured_output_format", None)
+        _reject_tool_choice(tool_choice, allow_any=allow_any_tool_choice)
         _reject_bind_tool_kwargs(kwargs)
         return self.model_copy(update={"bound_tools": tuple(_to_native_tool(tool) for tool in tools)})
 
@@ -266,8 +257,8 @@ def _reject_bind_tool_kwargs(kwargs: Mapping[str, object]) -> None:
     raise ValueError(f"Unsupported bind_tools options for native gateway adapter: {names}.")
 
 
-def _reject_tool_choice(tool_choice: object) -> None:
-    if tool_choice is None or tool_choice == "auto":
+def _reject_tool_choice(tool_choice: object, *, allow_any: bool = False) -> None:
+    if tool_choice is None or tool_choice == "auto" or (allow_any and tool_choice == "any"):
         return
     raise NotImplementedError("Only default or auto tool choice is supported by the native gateway adapter.")
 

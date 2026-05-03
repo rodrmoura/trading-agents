@@ -2,7 +2,7 @@
 
 Tests for the Python SDK live here and run with package-local pytest commands.
 
-Current P2.4 coverage:
+Current P3.4 coverage:
 
 - local importability and package metadata
 - no app-owned or command-line imports in package source
@@ -12,6 +12,6 @@ Current P2.4 coverage:
 - native SSE parser behavior for chunk, done, and error events
 - stream response cleanup on terminal events, parser errors, transport errors, and explicit iterator close
 - shallow native gateway type construction
-- optional LangChain Core adapter import, invocation, prompt-template composition, streaming, fallback boundaries, and token-safe representations
+- optional LangChain Core adapter import, invocation, prompt-template composition, streaming, non-streaming native tool calls, parser-level structured output, fallback boundaries, and token-safe representations
 
-Future packets own native structured-output contracts and native tool-calling compatibility.
+Future packets own any gateway-native structured-output contract beyond the current adapter-level tool-call parser compatibility.

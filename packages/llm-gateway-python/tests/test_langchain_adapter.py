@@ -5,6 +5,7 @@ import sys
 from collections.abc import Iterable
 
 import pytest
+from pydantic import BaseModel
 
 pytest.importorskip("langchain_core")
 
@@ -70,6 +71,61 @@ def make_model(client: FakeGatewayClient | None = None):
     from llm_gateway.langchain_adapter import GatewayChatModel
 
     return GatewayChatModel(client=client or FakeGatewayClient(), model="model-id")
+
+
+class StructuredDecision(BaseModel):
+    decision: str
+    confidence: float
+
+
+DICT_DECISION_SCHEMA = {
+    "title": "DictDecision",
+    "description": "A structured decision.",
+    "type": "object",
+    "properties": {
+        "signal": {"type": "string"},
+        "risk": {"type": "integer"},
+    },
+    "required": ["signal", "risk"],
+}
+
+
+def structured_tool_response(tool_name: str, tool_input: dict[str, object]) -> ChatResponse:
+    return ChatResponse(
+        id="gwchat_structured",
+        model="model-id",
+        created="2026-05-01T00:00:00.000Z",
+        message=ChatMessage(
+            role="assistant",
+            content="",
+            tool_calls=(GatewayToolCall(id="call_structured", name=tool_name, input=tool_input),),
+        ),
+        finish_reason="toolCalls",
+    )
+
+
+def assert_native_structured_request_only(request: ChatRequest, tool_name: str) -> None:
+    assert set(request.__dataclass_fields__) == {
+        "model",
+        "messages",
+        "request_id",
+        "metadata",
+        "tools",
+    }
+    assert request.metadata == {}
+    assert not hasattr(request, "tool_choice")
+    assert not hasattr(request, "response_format")
+    assert not hasattr(request, "ls_structured_output_format")
+    assert len(request.tools) == 1
+
+    native_tool = request.tools[0]
+    assert set(native_tool.__dataclass_fields__) == {"name", "description", "input_schema"}
+    assert native_tool.name == tool_name
+    assert native_tool.input_schema["type"] == "object"
+    assert not hasattr(native_tool, "function")
+    assert not hasattr(native_tool, "parameters")
+    assert not hasattr(native_tool, "tool_choice")
+    assert not hasattr(native_tool, "response_format")
 
 
 @tool
@@ -276,16 +332,71 @@ def test_unsupported_generation_kwargs_fail_without_prompt_leakage() -> None:
     assert prompt_text not in str(error_info.value)
 
 
-def test_structured_output_deferred_and_fallback_to_free_text_invoke() -> None:
-    client = FakeGatewayClient(responses=("Fallback answer",))
+def test_structured_output_pydantic_schema_parses_native_tool_call() -> None:
+    client = FakeGatewayClient(
+        responses=(structured_tool_response("StructuredDecision", {"decision": "Buy", "confidence": 0.82}),)
+    )
     adapter = make_model(client)
 
-    try:
-        adapter.with_structured_output({"type": "object"})
-    except NotImplementedError:
-        message = adapter.invoke("Use free text")
+    parsed = adapter.with_structured_output(StructuredDecision).invoke("Return structured data.")
 
-    assert message.content == "Fallback answer"
+    assert parsed == StructuredDecision(decision="Buy", confidence=0.82)
+    assert_native_structured_request_only(client.requests[0], "StructuredDecision")
+    assert "decision" in client.requests[0].tools[0].input_schema["properties"]
+
+
+def test_structured_output_dict_schema_parses_native_tool_call() -> None:
+    client = FakeGatewayClient(
+        responses=(structured_tool_response("DictDecision", {"signal": "hold", "risk": 2}),)
+    )
+    adapter = make_model(client)
+
+    parsed = adapter.with_structured_output(DICT_DECISION_SCHEMA).invoke("Return JSON data.")
+
+    assert parsed == {"signal": "hold", "risk": 2}
+    assert_native_structured_request_only(client.requests[0], "DictDecision")
+    assert "signal" in client.requests[0].tools[0].input_schema["properties"]
+
+
+def test_structured_output_include_raw_success_returns_raw_and_parsed() -> None:
+    client = FakeGatewayClient(
+        responses=(structured_tool_response("StructuredDecision", {"decision": "Sell", "confidence": 0.7}),)
+    )
+    adapter = make_model(client)
+
+    result = adapter.with_structured_output(StructuredDecision, include_raw=True).invoke(
+        "Return structured data."
+    )
+
+    assert set(result) == {"raw", "parsed", "parsing_error"}
+    assert isinstance(result["raw"], AIMessage)
+    assert result["raw"].tool_calls == [
+        {
+            "name": "StructuredDecision",
+            "args": {"decision": "Sell", "confidence": 0.7},
+            "id": "call_structured",
+            "type": "tool_call",
+        }
+    ]
+    assert result["parsed"] == StructuredDecision(decision="Sell", confidence=0.7)
+    assert result["parsing_error"] is None
+    assert_native_structured_request_only(client.requests[0], "StructuredDecision")
+
+
+def test_structured_output_include_raw_captures_parsing_error() -> None:
+    client = FakeGatewayClient(
+        responses=(structured_tool_response("StructuredDecision", {"confidence": 0.2}),)
+    )
+    adapter = make_model(client)
+
+    result = adapter.with_structured_output(StructuredDecision, include_raw=True).invoke(
+        "Return structured data."
+    )
+
+    assert isinstance(result["raw"], AIMessage)
+    assert result["parsed"] is None
+    assert isinstance(result["parsing_error"], Exception)
+    assert_native_structured_request_only(client.requests[0], "StructuredDecision")
 
 
 def test_bind_tools_with_real_tool_sends_native_tool_definitions() -> None:
@@ -387,12 +498,15 @@ def test_bind_tools_accepts_auto_tool_choice() -> None:
     assert client.requests[0].tools[0].name == "get_stock_data"
 
 
-def test_bind_tools_rejects_unsupported_tool_choice_without_prompt_leakage() -> None:
+@pytest.mark.parametrize("tool_choice", ["required", "get_stock_data", "any"])
+def test_bind_tools_rejects_unsupported_tool_choice_without_prompt_leakage(
+    tool_choice: str,
+) -> None:
     adapter = make_model()
     prompt_text = "private prompt text"
 
     with pytest.raises(NotImplementedError) as error_info:
-        adapter.bind_tools([get_stock_data], tool_choice="required")
+        adapter.bind_tools([get_stock_data], tool_choice=tool_choice)
 
     assert prompt_text not in str(error_info.value)
 

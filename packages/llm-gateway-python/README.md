@@ -2,7 +2,7 @@
 
 Generic Python SDK for the native VS Code LLM gateway.
 
-Current P3.3b scope:
+Current P3.4 scope:
 
 - package-local `pyproject.toml` for the `llm-gateway` distribution
 - importable `llm_gateway` source package
@@ -11,7 +11,7 @@ Current P3.3b scope:
 - blocking standard-library HTTP calls for `/health`, `/v1/models`, `/v1/chat/completions`, and `/v1/chat/completions/stream`
 - synchronous native SSE streaming through `GatewayClient.stream_chat()`
 - typed native gateway errors, malformed-response errors, and transport errors
-- optional LangChain Core adapter through `llm_gateway.langchain_adapter.GatewayChatModel`, including non-streaming `bind_tools()` support
+- optional LangChain Core adapter through `llm_gateway.langchain_adapter.GatewayChatModel`, including non-streaming `bind_tools()` and parser-level structured-output support
 - package-local tests for metadata, imports, boundaries, redaction, HTTP behavior, native error mapping, SSE parsing, stream cleanup, and LangChain adapter behavior
 
 This package should remain generic and avoid finance assumptions.
@@ -149,7 +149,7 @@ for chunk in chat_model.stream("Stream hello"):
 
 Non-empty stop sequences and unsupported generation options fail explicitly because the native gateway contract does not expose those request fields. Adapter string representations and identifying parameters do not expose bearer tokens.
 
-Structured output is not supported by the native gateway contract yet. `with_structured_output(...)` raises `NotImplementedError`; callers should catch it and fall back to free-text `invoke()` until a native structured-output contract exists.
+`GatewayChatModel.with_structured_output(...)` supports non-streaming parser-level structured output for Pydantic and dict/JSON schemas by using LangChain Core's tool-call parser path over the native `tools`/`toolCalls` bridge. Requests still contain only native gateway tool fields, and the gateway does not enforce tool choice or schema adherence. This is compatibility behavior in the Python adapter, not a gateway-native structured-output contract.
 
 Tool-enabled streaming is not supported yet. `GatewayClient.stream_chat()` rejects requests containing `tools`, prior assistant `tool_calls`, or tool result messages before opening HTTP. Use non-streaming `invoke()` for `bind_tools()` roundtrips.
 

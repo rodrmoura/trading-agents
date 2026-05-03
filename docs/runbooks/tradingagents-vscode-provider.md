@@ -86,7 +86,7 @@ Both `--max-debate-rounds` and `--max-risk-discuss-rounds` must be integers `>= 
 
 P3.3b supports mocked non-streaming `prompt | llm.bind_tools(tools)` roundtrips: the gateway can return native assistant `toolCalls`, the Python SDK/LangChain adapter can expose them as LangChain `AIMessage.tool_calls`, and a local LangGraph `ToolNode` can send tool results back as native `role: "tool"` messages on the next non-stream turn.
 
-P3.3c live proof passed on 2026-05-02 with a running VS Code gateway and model `claude-opus-4.6-1m`. The direct provider smoke validated provider construction and a direct LangChain `invoke()` call, and the full-graph harness validated a market-only `NVDA` run through Research Manager, Trader, and Portfolio Manager. Those downstream nodes used documented free-text fallback because `with_structured_output(...)` remains unsupported by the native gateway adapter.
+P3.3c live proof passed on 2026-05-02 with a running VS Code gateway and model `claude-opus-4.6-1m`. The direct provider smoke validated provider construction and a direct LangChain `invoke()` call, and the full-graph harness validated a market-only `NVDA` run through Research Manager, Trader, and Portfolio Manager. Those downstream nodes used documented free-text fallback because `with_structured_output(...)` was unsupported by the native gateway adapter at P3.3c time; current adapter behavior is recorded in `docs/repo_state/PROVEN_KNOWLEDGE.md`.
 
 ## Cleanup
 

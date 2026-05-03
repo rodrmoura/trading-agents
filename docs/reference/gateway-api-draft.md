@@ -209,7 +209,7 @@ Native non-streaming tool-call response:
 }
 ```
 
-`finishReason` is exactly `"toolCalls"` when `message.toolCalls` is non-empty; otherwise it is exactly `"stop"`. The gateway does not execute returned tool calls. Local clients execute tools and include prior assistant `toolCalls` plus `role: "tool"` results on the next model turn. Structured output normalization belongs in a later adapter or contract packet.
+`finishReason` is exactly `"toolCalls"` when `message.toolCalls` is non-empty; otherwise it is exactly `"stop"`. The gateway does not execute returned tool calls. Local clients execute tools and include prior assistant `toolCalls` plus `role: "tool"` results on the next model turn. Adapter-level structured-output parser compatibility can layer over this native tool-call bridge; gateway-native schema enforcement remains a separate future contract decision.
 
 ## Streaming Response
 
@@ -305,6 +305,6 @@ Status-code mapping:
 ## Open Decisions
 
 - Whether to add an OpenAI-compatible facade after the native Phase 1 path works.
-- Whether structured output should become gateway-native or remain adapter-level after Phase 1.
+- Whether structured output should also become gateway-native beyond the adapter-level tool-call parser compatibility path.
 - How to detect and advertise reliable per-model tool-calling capability through `/v1/models`.
 - How to support tool-enabled streaming without weakening the native non-streaming contract.
