@@ -14,6 +14,7 @@ Package-local SDK and LangChain adapter preflight:
 ```powershell
 Set-Location "C:\VSCode\Tauric\TradingAgents"
 $Python = "C:\VSCode\Tauric\TradingAgents\.venv\Scripts\python.exe"
+$env:PYTHONPATH = (Get-Location).Path
 & $Python -m pip install -e "packages/llm-gateway-python[langchain]"
 & $Python -c "import llm_gateway, llm_gateway.langchain_adapter; print('llm-gateway LangChain adapter import OK')"
 ```
@@ -63,7 +64,7 @@ The script reads `TRADINGAGENTS_VSCODE_GATEWAY_URL` and `TRADINGAGENTS_VSCODE_GA
 
 ## Run The Full-Graph Harness For P3.3c
 
-This is the repeatable command path for P3.3c live proof.
+This is the repeatable command path for P3.3c and post-P3.4 live proof. Keep `$env:PYTHONPATH` set to the repository root when running scripts from the source checkout so Python imports the current workspace provider instead of any stale installed package.
 
 Minimal one-analyst run using the default ticker, date, and one debate/risk round:
 
@@ -87,6 +88,8 @@ Both `--max-debate-rounds` and `--max-risk-discuss-rounds` must be integers `>= 
 P3.3b supports mocked non-streaming `prompt | llm.bind_tools(tools)` roundtrips: the gateway can return native assistant `toolCalls`, the Python SDK/LangChain adapter can expose them as LangChain `AIMessage.tool_calls`, and a local LangGraph `ToolNode` can send tool results back as native `role: "tool"` messages on the next non-stream turn.
 
 P3.3c live proof passed on 2026-05-02 with a running VS Code gateway and model `claude-opus-4.6-1m`. The direct provider smoke validated provider construction and a direct LangChain `invoke()` call, and the full-graph harness validated a market-only `NVDA` run through Research Manager, Trader, and Portfolio Manager. Those downstream nodes used documented free-text fallback because `with_structured_output(...)` was unsupported by the native gateway adapter at P3.3c time; current adapter behavior is recorded in `docs/repo_state/PROVEN_KNOWLEDGE.md`.
+
+Post-P3.4 live structured-output proof passed on 2026-05-03 with model `claude-sonnet-4.6`: a direct `with_structured_output(..., include_raw=True)` call returned a parsed Pydantic instance and one raw tool call, and the full graph harness passed for the same `NVDA` market-only path without structured-output unsupported or invocation-fallback warnings in the successful terminal output.
 
 ## Cleanup
 

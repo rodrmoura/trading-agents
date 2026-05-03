@@ -1225,6 +1225,7 @@ Validation:
 - `c:/VSCode/Tauric/TradingAgents/.venv/Scripts/python.exe -m pytest -q packages/llm-gateway-python/tests/test_langchain_adapter.py packages/llm-gateway-python/tests/test_sdk_skeleton.py` (`94 passed`)
 - `c:/VSCode/Tauric/TradingAgents/.venv/Scripts/python.exe -m pytest -q tests/test_structured_agents.py tests/test_vscode_tradingagents_graph_smoke_script.py tests/test_vscode_provider_boundary.py` (`47 passed`)
 - PhD Critic implementation review approved the P3.4 diff with no blocking findings; optional follow-ups are an explicit `with_structured_output(...).stream(...)` adapter test and a note/test guarding LangChain Core's internal `ls_structured_output_format` metadata behavior.
+- Post-P3.4 live smoke passed against `claude-sonnet-4.6`: direct `with_structured_output(..., include_raw=True)` returned one raw tool call and a parsed Pydantic instance, then `scripts/smoke_vscode_tradingagents_graph.py` passed for `NVDA`/`2024-05-10` with market analyst selected and field counts `market_report=7501`, `investment_plan=2551`, `trader_investment_plan=1009`, `final_trade_decision=2523`. The successful graph command required `PYTHONPATH` set to the repository root.
 
 ## Phase 4 Packets: Generalized Contracts
 

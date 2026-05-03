@@ -17,11 +17,12 @@ This file owns medium-term governance priorities and parked work. Product-specif
 - Treat P3.3b mocked non-stream native tool-call roundtrip as complete and review-approved.
 - Treat P3.3c full-graph smoke harness readiness and live full-graph smoke proof as complete.
 - Treat P3.4 structured-output adapter compatibility as complete and review-approved.
+- Treat post-P3.4 live structured-output smoke through a real VS Code model as complete.
 
 ## Next
 
 - Keep using the phase execution queue in `docs/planning/codex-task-packets.md` for handoffs.
-- Decide whether to run a live post-P3.4 full-graph smoke for downstream decision nodes before moving to the next `vscode` provider slice.
+- Choose the next `vscode` provider slice: gateway-native structured-output contract decisions, model capability advertisement, or tool-enabled streaming.
 
 ## Later
 

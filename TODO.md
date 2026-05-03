@@ -90,6 +90,7 @@ Active backlog for the Tauric VS Code LLM integration and generalized agent coll
 - [x] P3.3c Prepare full-graph smoke harness without claiming live proof.
 - [x] P3.3c Run and record live full one-ticker TradingAgents smoke through VS Code models.
 - [x] P3.4 Add structured-output adapter compatibility.
+- [x] P3.4 Run live post-structured-output full-graph smoke through VS Code models.
 
 ## Open Questions
 
