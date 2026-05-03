@@ -74,9 +74,11 @@ Analyst agents call `llm.bind_tools(tools)`:
 - `tradingagents/agents/analysts/news_analyst.py`
 - `tradingagents/agents/analysts/fundamentals_analyst.py`
 
-The current SDK adapter intentionally raises `NotImplementedError` from `GatewayChatModel.bind_tools(...)`. That makes analyst execution the main G3 blocker. P3.2 can still add provider construction and missing-config tests, but a full one-ticker run through analysts cannot pass until a later packet adds one of these:
+Update after P3.3b: the SDK adapter now supports non-stream native `bind_tools(...)` roundtrip through the VS Code gateway and LangGraph can still execute Python tools locally. This audit section is retained as historical rationale for why P3.3b was needed.
 
-- native gateway tool-calling support and SDK adapter support, or
+A live full one-ticker run through analysts is still unproven until a later smoke packet records it against a running VS Code gateway/model. If that live path fails, reopen one of these strategies:
+
+- additional native gateway tool-calling support and SDK adapter support,
 - a TradingAgents-specific analyst fallback that runs tools outside `bind_tools`, or
 - a smoke path that starts after analyst reports already exist.
 

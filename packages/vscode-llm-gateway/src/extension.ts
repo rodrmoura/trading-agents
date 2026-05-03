@@ -19,6 +19,47 @@ const gateway = createGatewayController({
   modelService: createVsCodeModelService(vscode.lm, {
     createUserMessage: (content: string) => vscode.LanguageModelChatMessage.User(content),
     createAssistantMessage: (content: string) => vscode.LanguageModelChatMessage.Assistant(content),
+    createAssistantToolCallMessage: (content, toolCalls) => {
+      const parts = [
+        ...(content.length > 0 ? [new vscode.LanguageModelTextPart(content)] : []),
+        ...toolCalls.map(
+          (toolCall) => new vscode.LanguageModelToolCallPart(toolCall.id, toolCall.name, toolCall.input)
+        ),
+      ];
+      return vscode.LanguageModelChatMessage.Assistant(parts);
+    },
+    createToolResultMessage: (toolCallId, content) =>
+      vscode.LanguageModelChatMessage.User([
+        new vscode.LanguageModelToolResultPart(toolCallId, [new vscode.LanguageModelTextPart(content)]),
+      ]),
+    createTool: (tool) => ({
+      name: tool.name,
+      description: tool.description,
+      ...(tool.inputSchema ? { inputSchema: tool.inputSchema } : {}),
+    }),
+    extractTextResponsePart: (part) =>
+      part instanceof vscode.LanguageModelTextPart ? part.value : null,
+    extractToolCallResponsePart: (part) => {
+      if (!(part instanceof vscode.LanguageModelToolCallPart)) {
+        return null;
+      }
+
+      if (
+        part.callId.trim().length === 0 ||
+        part.name.trim().length === 0 ||
+        typeof part.input !== "object" ||
+        part.input === null ||
+        Array.isArray(part.input)
+      ) {
+        return null;
+      }
+
+      return {
+        id: part.callId,
+        name: part.name,
+        input: part.input as Record<string, unknown>,
+      };
+    },
     createCancellationSource: () => new vscode.CancellationTokenSource(),
   }),
 });

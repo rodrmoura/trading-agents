@@ -182,10 +182,30 @@ def _prompt_custom_model_id() -> str:
     ).ask().strip()
 
 
+def _prompt_vscode_model_id(mode: str) -> str:
+    """Prompt user to type an opaque VS Code Gateway model ID."""
+    model = questionary.text(
+        (
+            f"Enter VS Code Gateway model ID ({mode}-thinking). "
+            "List available models with the gateway /v1/models command or runbook:"
+        ),
+        validate=lambda x: len(x.strip()) > 0 or "Please enter a model ID.",
+    ).ask()
+
+    if model is None:
+        console.print(f"\n[red]No {mode} thinking llm engine selected. Exiting...[/red]")
+        exit(1)
+
+    return model.strip()
+
+
 def _select_model(provider: str, mode: str) -> str:
     """Select a model for the given provider and mode (quick/deep)."""
     if provider.lower() == "openrouter":
         return select_openrouter_model()
+
+    if provider.lower() == "vscode":
+        return _prompt_vscode_model_id(mode)
 
     if provider.lower() == "azure":
         return questionary.text(
@@ -242,6 +262,7 @@ def select_llm_provider() -> tuple[str, str | None]:
         ("OpenRouter", "openrouter", "https://openrouter.ai/api/v1"),
         ("Azure OpenAI", "azure", None),
         ("Ollama", "ollama", "http://localhost:11434/v1"),
+        ("VS Code Gateway", "vscode", None),
     ]
 
     choice = questionary.select(

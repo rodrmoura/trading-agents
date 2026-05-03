@@ -21,6 +21,8 @@ from llm_gateway import (
     GatewayHealth,
     GatewayModel,
     GatewayModelCapabilities,
+    GatewayTool,
+    GatewayToolCall,
     GatewayRequestError,
     GatewayResponseError,
     GatewayTransportError,
@@ -345,6 +347,45 @@ def test_stream_chat_requires_non_empty_token_at_method_call(
 
 
 @pytest.mark.parametrize(
+    "chat_request",
+    [
+        ChatRequest(
+            model="model-id",
+            messages=[ChatMessage(role="user", content="Hello")],
+            tools=(GatewayTool(name="get_stock_data", description="", input_schema={}),),
+        ),
+        ChatRequest(
+            model="model-id",
+            messages=[
+                ChatMessage(
+                    role="assistant",
+                    content="",
+                    tool_calls=(GatewayToolCall(id="call_1", name="get_stock_data", input={}),),
+                )
+            ],
+        ),
+        ChatRequest(
+            model="model-id",
+            messages=[ChatMessage(role="tool", tool_call_id="call_1", content="result")],
+        ),
+    ],
+)
+def test_stream_chat_rejects_tool_enabled_requests_before_http(
+    monkeypatch: pytest.MonkeyPatch, chat_request: ChatRequest
+) -> None:
+    def stub_urlopen(request_object: object, timeout: float | None = None) -> StubStreamResponse:
+        raise AssertionError("HTTP should not be attempted for tool-enabled streams")
+
+    monkeypatch.setattr("llm_gateway.client.urllib_request.urlopen", stub_urlopen)
+    client = GatewayClient(
+        GatewayClientConfig(base_url="http://127.0.0.1:49152", token="synthetic-token")
+    )
+
+    with pytest.raises(GatewayConfigurationError):
+        client.stream_chat(chat_request)
+
+
+@pytest.mark.parametrize(
     "body",
     [
         b"event: chunk\ndata: not-json\n\n",
@@ -551,9 +592,16 @@ def test_native_gateway_type_construction() -> None:
         messages=[
             ChatMessage(role="system", content="Instruction"),
             ChatMessage(role="user", content="Hello"),
+            ChatMessage(
+                role="assistant",
+                content="",
+                tool_calls=(GatewayToolCall(id="call_1", name="lookup", input={"ticker": "MSFT"}),),
+            ),
+            ChatMessage(role="tool", content="result", tool_call_id="call_1"),
         ],
         request_id="client-request-id",
         metadata={"source": "test"},
+        tools=(GatewayTool(name="lookup", description="", input_schema={"type": "object"}),),
     )
     response = ChatResponse(
         id="gwchat_opaque-id",
@@ -566,6 +614,8 @@ def test_native_gateway_type_construction() -> None:
     assert health.auth == "bearer"
     assert model.capabilities.streaming is True
     assert request.messages[0].role == "system"
+    assert request.messages[2].tool_calls[0].id == "call_1"
+    assert request.tools[0].input_schema == {"type": "object"}
     assert response.usage is None
     assert response.message.role == "assistant"
 
@@ -749,6 +799,115 @@ def test_chat_posts_authenticated_native_json(monkeypatch: pytest.MonkeyPatch) -
     )
 
 
+def test_chat_serializes_native_tools_and_prior_tool_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    token = "synthetic-chat-token"
+    seen: dict[str, object] = {}
+
+    def stub_urlopen(request: object, timeout: float | None = None) -> StubResponse:
+        seen["body"] = json.loads(request.data.decode("utf-8"))
+        return StubResponse(
+            {
+                "id": "gwchat_opaque-id",
+                "model": "vscode-model-id",
+                "created": "2026-05-01T00:00:00.000Z",
+                "message": {"role": "assistant", "content": "done"},
+                "finishReason": "stop",
+                "usage": None,
+                "metadata": {},
+            }
+        )
+
+    monkeypatch.setattr("llm_gateway.client.urllib_request.urlopen", stub_urlopen)
+    client = GatewayClient(GatewayClientConfig(base_url="http://127.0.0.1:49152", token=token))
+
+    client.chat(
+        ChatRequest(
+            model="vscode-model-id",
+            messages=[
+                ChatMessage(role="user", content="Need data."),
+                ChatMessage(
+                    role="assistant",
+                    content="",
+                    tool_calls=(
+                        GatewayToolCall(
+                            id="call_1", name="get_stock_data", input={"ticker": "MSFT"}
+                        ),
+                    ),
+                ),
+                ChatMessage(role="tool", tool_call_id="call_1", content="price=123"),
+            ],
+            tools=(
+                GatewayTool(
+                    name="get_stock_data",
+                    description="Fetch stock data.",
+                    input_schema={"type": "object", "properties": {"ticker": {"type": "string"}}},
+                ),
+            ),
+        )
+    )
+
+    assert seen["body"] == {
+        "model": "vscode-model-id",
+        "messages": [
+            {"role": "user", "content": "Need data."},
+            {
+                "role": "assistant",
+                "content": "",
+                "toolCalls": [
+                    {"id": "call_1", "name": "get_stock_data", "input": {"ticker": "MSFT"}}
+                ],
+            },
+            {"role": "tool", "content": "price=123", "toolCallId": "call_1"},
+        ],
+        "tools": [
+            {
+                "name": "get_stock_data",
+                "description": "Fetch stock data.",
+                "inputSchema": {"type": "object", "properties": {"ticker": {"type": "string"}}},
+            }
+        ],
+    }
+
+
+def test_chat_parses_native_tool_call_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    def stub_urlopen(request: object, timeout: float | None = None) -> StubResponse:
+        return StubResponse(
+            {
+                "id": "gwchat_opaque-id",
+                "model": "vscode-model-id",
+                "created": "2026-05-01T00:00:00.000Z",
+                "message": {
+                    "role": "assistant",
+                    "content": "",
+                    "toolCalls": [
+                        {"id": "call_1", "name": "get_stock_data", "input": {"ticker": "MSFT"}}
+                    ],
+                },
+                "finishReason": "toolCalls",
+                "usage": None,
+                "metadata": {},
+            }
+        )
+
+    monkeypatch.setattr("llm_gateway.client.urllib_request.urlopen", stub_urlopen)
+    client = GatewayClient(
+        GatewayClientConfig(base_url="http://127.0.0.1:49152", token="synthetic-token")
+    )
+
+    response = client.chat(
+        ChatRequest(model="vscode-model-id", messages=[ChatMessage(role="user", content="Hi")])
+    )
+
+    assert response.finish_reason == "toolCalls"
+    assert response.message == ChatMessage(
+        role="assistant",
+        content="",
+        tool_calls=(GatewayToolCall(id="call_1", name="get_stock_data", input={"ticker": "MSFT"}),),
+    )
+
+
 def test_chat_omits_unset_optional_request_fields(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict[str, object] = {}
 
@@ -928,6 +1087,63 @@ def test_request_error_message_redacts_config_token(monkeypatch: pytest.MonkeyPa
             "usage": None,
             "metadata": {},
         },
+        {
+            "id": "gwchat_opaque-id",
+            "model": "model-id",
+            "created": "2026-05-01T00:00:00.000Z",
+            "message": {"role": "assistant", "content": "", "toolCalls": []},
+            "finishReason": "toolCalls",
+            "usage": None,
+            "metadata": {},
+        },
+        {
+            "id": "gwchat_opaque-id",
+            "model": "model-id",
+            "created": "2026-05-01T00:00:00.000Z",
+            "message": {
+                "role": "assistant",
+                "content": "",
+                "toolCalls": [{"id": " ", "name": "tool", "input": {}}],
+            },
+            "finishReason": "toolCalls",
+            "usage": None,
+            "metadata": {},
+        },
+        {
+            "id": "gwchat_opaque-id",
+            "model": "model-id",
+            "created": "2026-05-01T00:00:00.000Z",
+            "message": {
+                "role": "assistant",
+                "content": "",
+                "toolCalls": [{"id": "call_1", "name": "tool", "input": []}],
+            },
+            "finishReason": "toolCalls",
+            "usage": None,
+            "metadata": {},
+        },
+        {
+            "id": "gwchat_opaque-id",
+            "model": "model-id",
+            "created": "2026-05-01T00:00:00.000Z",
+            "message": {
+                "role": "assistant",
+                "content": "",
+                "toolCalls": [{"id": "call_1", "name": "tool", "input": {}}],
+            },
+            "finishReason": "stop",
+            "usage": None,
+            "metadata": {},
+        },
+        {
+            "id": "gwchat_opaque-id",
+            "model": "model-id",
+            "created": "2026-05-01T00:00:00.000Z",
+            "message": {"role": "assistant", "content": "plain"},
+            "finishReason": "toolCalls",
+            "usage": None,
+            "metadata": {},
+        },
     ],
 )
 def test_malformed_success_payloads_raise_response_error(
@@ -1012,16 +1228,17 @@ def test_transport_failure_raises_transport_error_without_token(
     assert error_info.value.__cause__ is None
 
 
-def test_readme_reflects_p2_3_client_scope() -> None:
+def test_readme_reflects_current_client_scope() -> None:
     readme = README.read_text(encoding="utf-8")
 
     stale_phrase = "health`, `list_models`, and `chat` methods intentionally raise"
     assert stale_phrase not in readme
-    assert "Current P2.4 scope" in readme
+    assert "Current P3.3b scope" in readme
     assert "synchronous native SSE streaming" in readme
     assert "llm_gateway.langchain_adapter.GatewayChatModel" in readme
     assert "with_structured_output(...)` raises `NotImplementedError`" in readme
-    assert "bind_tools(...)` raises `NotImplementedError`" in readme
+    assert "bind_tools(tools)` supports non-streaming native tool-call roundtrips" in readme
+    assert "Tool-enabled streaming is not supported yet" in readme
 
 
 def test_source_and_tests_avoid_forbidden_boundaries_and_facade_terms() -> None:

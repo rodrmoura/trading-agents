@@ -39,9 +39,11 @@ Use this table as the planning index. The detailed packet sections below remain 
 | 2 | P2.2 | Implement gateway client and typed errors | P2.1 and stable gateway responses | Completed this session; implementation and review approved |
 | 2 | P2.3 | Implement streaming client | P1.5 and P2.2 | Completed this session; implementation and review approved |
 | 2 | P2.4 | Implement LangChain-compatible adapter | P2.2/P2.3 and TradingAgents integration audit | Completed this session; implementation and review approved |
-| 3 | P3.1 | Audit TradingAgents provider integration points | G2 passed or SDK shape stable | Planned |
-| 3 | P3.2 | Add thin `vscode` provider boundary | P3.1 and SDK adapter | Planned |
-| 3 | P3.3 | Add CLI and smoke script for gateway run | P3.2 | Planned |
+| 3 | P3.1 | Audit TradingAgents provider integration points | G2 passed or SDK shape stable | Completed this session |
+| 3 | P3.2 | Add thin `vscode` provider boundary | P3.1 and SDK adapter | Completed this session; implementation and review approved |
+| 3 | P3.3a | Add direct provider smoke script and runbook | P3.2 | Completed this session; implementation and review approved |
+| 3 | P3.3b | Implement native non-stream tool-call roundtrip | P3.3a | Completed this session; implementation and review approved |
+| 3 | P3.3c | Prove live one-ticker TradingAgents smoke path | P3.3b plus running VS Code gateway/model | Planned |
 | 4 | P4.1 | Formalize agent and workflow schemas | G3 passed | Planned |
 | 4 | P4.2 | Define tool, event, artifact, memory, and checkpoint contracts | P4.1 | Planned |
 | 4 | P4.3 | Create product strategy review example | P4.1/P4.2 | Planned |
@@ -1023,6 +1025,8 @@ Validation:
 
 ### P3.2 Add `vscode` Provider Boundary
 
+Status: completed; implementation and review approved in this session. The provider boundary is construction-focused and does not make full analyst execution pass.
+
 Model: Codex coding model extra-high.
 
 Objective: add a thin `vscode` provider routed through the Python SDK/adapter.
@@ -1070,42 +1074,124 @@ Docs:
 - `docs/architecture/code-governance.md` if patch pattern changes.
 - patch log if created.
 
-### P3.3 Add CLI And Smoke Script For Gateway Run
+### P3.3a Add Direct Provider Smoke Script And Runbook
+
+Status: completed this session; implementation and review approved. This slice proves provider construction and optional direct `GatewayChatModel.invoke(...)`, not a full one-ticker analyst graph.
 
 Model: Codex coding model high.
 
-Objective: make a one-ticker TradingAgents gateway smoke run straightforward.
+Objective: make a constrained TradingAgents `vscode` provider smoke run straightforward without claiming full analyst support.
 
 Read first:
 
-- `cli/main.py`
-- `cli/utils.py`
-- `scripts/smoke_structured_output.py`
+- `tradingagents/llm_clients/vscode_client.py`
+- `scripts/smoke_vscode_provider.py`
+- `docs/runbooks/gateway-g1-smoke.md`
 - provider implementation
 
 May edit:
 
-- `cli/**`
 - `scripts/**`
-- `apps/tradingagents-adapter/**`
 - `docs/runbooks/**`
+- `tests/**`
 
 Steps:
 
-1. Add CLI/provider config needed for `vscode`.
-2. Add or update smoke script for gateway-backed run.
+1. Add a smoke script that reads the `vscode` gateway environment and constructs the provider.
+2. Support construction-only mode and one direct `llm.invoke(...)` call.
 3. Add runbook steps with required environment variables but no secret values.
-4. Add tests where feasible.
+4. Add mocked tests for env/model/prompt validation, construction-only mode, invoke mode, and token redaction.
 
 Acceptance criteria:
 
-- User can follow runbook to start gateway and run one ticker analysis.
-- Script does not print tokens or secrets.
+- User can follow the runbook to start the gateway and validate provider construction/direct invoke.
+- Script does not print tokens or secrets, including in failure or assistant-output text.
+- Runbook remains explicit that full analyst graph execution is blocked.
 
 Validation:
 
 - targeted tests
-- manual smoke if gateway exists
+- manual direct provider smoke if gateway exists
+- `git diff --check`
+
+### P3.3b Implement Native Non-Stream Tool-Call Roundtrip
+
+Status: completed this session; implementation and review approved. This slice proves mocked native tool-call roundtrip across the gateway, SDK, and LangChain adapter, not a live full one-ticker TradingAgents run.
+
+Model: Codex coding model extra-high.
+
+Objective: let TradingAgents analysts receive LangChain `AIMessage.tool_calls` through the `vscode` provider so LangGraph `ToolNode` can execute local Python tools and send tool results back on the next non-stream model turn.
+
+Read first:
+
+- `docs/reference/tradingagents-vscode-provider-audit.md`
+- `packages/llm-gateway-python/src/llm_gateway/langchain_adapter.py`
+- `tradingagents/agents/**`
+- `tradingagents/graph/**`
+- `docs/runbooks/tradingagents-vscode-provider.md`
+
+May edit:
+
+- `packages/vscode-llm-gateway/**`
+- `packages/llm-gateway-python/**`
+- gateway API/runbook docs
+
+Do not edit:
+
+- Do not weaken analyst behavior, silently skip required tools, add OpenAI-compatible endpoint/field names, or claim live full-smoke success from mocked roundtrip tests.
+
+Acceptance criteria:
+
+- Non-stream `/v1/chat/completions` supports native `tools`, assistant `toolCalls`, and `role: "tool"` messages.
+- `/v1/chat/completions/stream` remains text-only and rejects tool-enabled requests before model invocation.
+- `GatewayChatModel.bind_tools()` returns a bound clone and round-trips LangChain tool calls/results through native SDK types without OpenAI contract leakage.
+
+Validation:
+
+- gateway package check/compile/tests
+- SDK package tests
+- full root pytest
+- `git diff --check`
+
+### P3.3c Prove Live One-Ticker TradingAgents Smoke Path
+
+Status: planned; harness readiness is not live proof.
+
+Model: Codex coding model extra-high.
+
+Objective: prepare a repeatable full-graph smoke harness, then run and record a live full one-ticker TradingAgents path through VS Code models without bypassing analyst requirements silently.
+
+Read first:
+
+- `docs/runbooks/tradingagents-vscode-provider.md`
+- `docs/reference/gateway-api-draft.md`
+- `scripts/smoke_vscode_provider.py`
+- `tests/test_vscode_provider_smoke_script.py`
+- `tradingagents/graph/trading_graph.py`
+- `tradingagents/agents/**`
+
+May edit:
+
+- smoke/runbook docs and narrow test/script helpers if live execution exposes operator gaps.
+
+Do not edit:
+
+- Do not claim full smoke success unless the live path runs through the relevant graph roles.
+
+Acceptance criteria:
+
+- Harness readiness: `scripts/smoke_vscode_tradingagents_graph.py` can validate gateway environment, model, ticker, ISO trade date, analyst list, output paths, and round counts before graph construction; builds an isolated `vscode` graph config; calls `TradingAgentsGraph(...).propagate(ticker, trade_date)`; checks nonblank selected analyst reports plus `investment_plan`, `trader_investment_plan`, `final_trade_decision`, and processed decision; prints concise token-redacted evidence with field character counts instead of report bodies.
+- Harness readiness: deterministic mocked tests cover input validation before construction, config construction, propagation arguments, success redaction, final-state enforcement, and graph construction/propagation exception redaction.
+- Live proof: the harness command in `docs/runbooks/tradingagents-vscode-provider.md` exits successfully against a running VS Code gateway/model.
+- Live proof: Research Manager, Trader, and Portfolio Manager coverage is proven or any accepted fallback/degraded structured-output behavior is explicitly recorded.
+- Live proof: token handling and gateway model IDs remain opaque and secret-safe.
+- P3.3c must not be marked completed from mocked harness tests alone.
+
+Validation:
+
+- harness readiness targeted tests for the graph smoke script and existing VS Code provider smoke/boundary tests
+- documented live smoke evidence for completion of P3.3c live proof
+- full root pytest if resources allow after code changes
 - `git diff --check`
 
 ## Phase 4 Packets: Generalized Contracts

@@ -14,4 +14,5 @@ Current runbooks:
 
 - [Documentation Validation](docs-validation.md)
 - [Gateway G1 Smoke](gateway-g1-smoke.md)
+- [TradingAgents VS Code Provider Smoke](tradingagents-vscode-provider.md)
 - [Upstream Sync](upstream-sync.md)

@@ -5,9 +5,12 @@ import { createNativeError, sendJson, sendNativeError } from "./errors";
 import {
   mapLanguageModelErrorCode,
   type GatewayChatMessage,
+  type GatewayChatCompletion,
   type GatewayModelService,
   type GatewayChatRole,
   type GatewayStartedChat,
+  type GatewayTool,
+  type GatewayToolCall,
 } from "./modelService";
 import type { GatewayHealthResponse } from "./types";
 
@@ -30,13 +33,18 @@ type RouteHandler = (request: IncomingMessage, response: ServerResponse) => void
 
 const MAX_CHAT_BODY_BYTES = 1024 * 1024;
 
-const CHAT_REQUEST_ALLOWED_KEYS = new Set(["model", "messages", "requestId", "metadata"]);
-const CHAT_MESSAGE_ALLOWED_KEYS = new Set(["role", "content"]);
-const CHAT_ROLES = new Set<GatewayChatRole>(["system", "user", "assistant"]);
+const CHAT_REQUEST_ALLOWED_KEYS = new Set(["model", "messages", "requestId", "metadata", "tools"]);
+const TEXT_CHAT_MESSAGE_ALLOWED_KEYS = new Set(["role", "content"]);
+const ASSISTANT_CHAT_MESSAGE_ALLOWED_KEYS = new Set(["role", "content", "toolCalls"]);
+const TOOL_CHAT_MESSAGE_ALLOWED_KEYS = new Set(["role", "toolCallId", "content"]);
+const TOOL_OBJECT_ALLOWED_KEYS = new Set(["name", "description", "inputSchema"]);
+const TOOL_CALL_ALLOWED_KEYS = new Set(["id", "name", "input"]);
+const CHAT_ROLES = new Set<GatewayChatRole>(["system", "user", "assistant", "tool"]);
 
 interface ParsedChatRequest {
   readonly model: string;
   readonly messages: readonly GatewayChatMessage[];
+  readonly tools?: readonly GatewayTool[];
 }
 
 interface ChatResponseBody {
@@ -46,8 +54,9 @@ interface ChatResponseBody {
   readonly message: {
     readonly role: "assistant";
     readonly content: string;
+    readonly toolCalls?: readonly GatewayToolCall[];
   };
-  readonly finishReason: "stop";
+  readonly finishReason: "stop" | "toolCalls";
   readonly usage: null;
   readonly metadata: Record<string, never>;
 }
@@ -58,6 +67,155 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function hasText(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, allowedKeys: ReadonlySet<string>): boolean {
+  for (const key of Object.keys(value)) {
+    if (!allowedKeys.has(key)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function parseToolCall(value: unknown): GatewayToolCall | null {
+  if (!isRecord(value) || !hasOnlyKeys(value, TOOL_CALL_ALLOWED_KEYS)) {
+    return null;
+  }
+
+  if (!hasText(value.id) || !hasText(value.name) || !isRecord(value.input)) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    name: value.name,
+    input: value.input,
+  };
+}
+
+function parseToolCalls(value: unknown): readonly GatewayToolCall[] | null {
+  if (!Array.isArray(value) || value.length === 0) {
+    return null;
+  }
+
+  const toolCalls: GatewayToolCall[] = [];
+  for (const item of value) {
+    const toolCall = parseToolCall(item);
+    if (!toolCall) {
+      return null;
+    }
+
+    toolCalls.push(toolCall);
+  }
+
+  return toolCalls;
+}
+
+function parseTool(value: unknown): GatewayTool | null {
+  if (!isRecord(value) || !hasOnlyKeys(value, TOOL_OBJECT_ALLOWED_KEYS)) {
+    return null;
+  }
+
+  if (!hasText(value.name) || typeof value.description !== "string") {
+    return null;
+  }
+
+  if (value.inputSchema !== undefined && !isRecord(value.inputSchema)) {
+    return null;
+  }
+
+  return value.inputSchema === undefined
+    ? {
+        name: value.name,
+        description: value.description,
+      }
+    : {
+        name: value.name,
+        description: value.description,
+        inputSchema: value.inputSchema,
+      };
+}
+
+function parseTools(value: unknown): readonly GatewayTool[] | null {
+  if (!Array.isArray(value) || value.length === 0) {
+    return null;
+  }
+
+  const tools: GatewayTool[] = [];
+  for (const item of value) {
+    const tool = parseTool(item);
+    if (!tool) {
+      return null;
+    }
+
+    tools.push(tool);
+  }
+
+  return tools;
+}
+
+function parseChatMessage(item: unknown): GatewayChatMessage | null {
+  if (!isRecord(item)) {
+    return null;
+  }
+
+  const role = item.role;
+  if (typeof role !== "string" || !CHAT_ROLES.has(role as GatewayChatRole)) {
+    return null;
+  }
+
+  if (role === "tool") {
+    if (!hasOnlyKeys(item, TOOL_CHAT_MESSAGE_ALLOWED_KEYS)) {
+      return null;
+    }
+
+    if (!hasText(item.toolCallId) || typeof item.content !== "string") {
+      return null;
+    }
+
+    return {
+      role: "tool",
+      toolCallId: item.toolCallId,
+      content: item.content,
+    };
+  }
+
+  if (role === "assistant") {
+    if (!hasOnlyKeys(item, ASSISTANT_CHAT_MESSAGE_ALLOWED_KEYS) || typeof item.content !== "string") {
+      return null;
+    }
+
+    if (item.toolCalls !== undefined) {
+      const toolCalls = parseToolCalls(item.toolCalls);
+      if (!toolCalls) {
+        return null;
+      }
+
+      return {
+        role: "assistant",
+        content: item.content,
+        toolCalls,
+      };
+    }
+
+    return hasText(item.content)
+      ? {
+          role: "assistant",
+          content: item.content,
+        }
+      : null;
+  }
+
+  if (!hasOnlyKeys(item, TEXT_CHAT_MESSAGE_ALLOWED_KEYS) || !hasText(item.content)) {
+    return null;
+  }
+
+  return {
+    role: role as "system" | "user",
+    content: item.content,
+  };
 }
 
 function parseContentLength(contentLengthHeader: string | undefined): number | null {
@@ -136,37 +294,26 @@ function parseChatRequest(body: unknown): ParsedChatRequest | null {
     return null;
   }
 
+  const tools = body.tools === undefined ? undefined : parseTools(body.tools);
+  if (body.tools !== undefined && !tools) {
+    return null;
+  }
+
   const messages: GatewayChatMessage[] = [];
 
   for (const item of body.messages) {
-    if (!isRecord(item)) {
+    const message = parseChatMessage(item);
+    if (!message) {
       return null;
     }
 
-    for (const key of Object.keys(item)) {
-      if (!CHAT_MESSAGE_ALLOWED_KEYS.has(key)) {
-        return null;
-      }
-    }
-
-    const role = item.role;
-    if (typeof role !== "string" || !CHAT_ROLES.has(role as GatewayChatRole)) {
-      return null;
-    }
-
-    if (!hasText(item.content)) {
-      return null;
-    }
-
-    messages.push({
-      role: role as GatewayChatRole,
-      content: item.content,
-    });
+    messages.push(message);
   }
 
   return {
     model: body.model,
     messages,
+    ...(tools ? { tools } : {}),
   };
 }
 
@@ -216,19 +363,44 @@ async function parseAndValidateChatRequest(
   return parsedRequest;
 }
 
-function buildChatResponse(model: string, content: string): ChatResponseBody {
+function normalizeCompletion(completion: GatewayChatCompletion): { content: string; toolCalls?: readonly GatewayToolCall[] } {
+  if (typeof completion === "string") {
+    return { content: completion };
+  }
+
+  return {
+    content: completion.message.content,
+    ...(completion.message.toolCalls && completion.message.toolCalls.length > 0
+      ? { toolCalls: completion.message.toolCalls }
+      : {}),
+  };
+}
+
+function buildChatResponse(model: string, completion: GatewayChatCompletion): ChatResponseBody {
+  const message = normalizeCompletion(completion);
+
   return {
     id: `gwchat_${randomUUID()}`,
     model,
     created: new Date().toISOString(),
     message: {
       role: "assistant",
-      content,
+      content: message.content,
+      ...(message.toolCalls ? { toolCalls: message.toolCalls } : {}),
     },
-    finishReason: "stop",
+    finishReason: message.toolCalls ? "toolCalls" : "stop",
     usage: null,
     metadata: {},
   };
+}
+
+function hasToolContext(request: ParsedChatRequest): boolean {
+  return Boolean(
+    (request.tools && request.tools.length > 0) ||
+      request.messages.some(
+        (message) => message.role === "tool" || (message.toolCalls && message.toolCalls.length > 0)
+      )
+  );
 }
 
 function canWriteResponse(response: ServerResponse): boolean {
@@ -412,6 +584,11 @@ async function handleChatCompletionsStreamRequest(
 
   const parsedRequest = await parseAndValidateChatRequest(request, response);
   if (!parsedRequest) {
+    return;
+  }
+
+  if (hasToolContext(parsedRequest)) {
+    sendNativeError(response, "validation_error");
     return;
   }
 

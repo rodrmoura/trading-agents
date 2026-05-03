@@ -7,14 +7,13 @@
 - Python environment setup is repaired, upgraded, and validated; `requirements.txt` is a documented compatibility/test-install shim and `uv.lock` is refreshed to current `pyproject.toml` metadata.
 - VS Code gateway package implementation packets P1.1 through P1.5 in `packages/vscode-llm-gateway` are implemented and review-approved this session.
 - G1 live VS Code extension smoke with a real VS Code model passed and is accepted.
-- Phase 2 P2.1 through P2.4 are implemented, verified, and review-approved; P3.1 TradingAgents provider integration audit is complete, and P3.2 thin `vscode` provider boundary is the next planned handoff.
+- Phase 2 P2.1 through P2.4 are implemented, verified, and review-approved; P3.1 TradingAgents provider integration audit, P3.2 thin `vscode` provider boundary, P3.3a direct provider smoke/runbook slice, P3.3b mocked non-stream native tool-call roundtrip, and P3.3c full-graph smoke harness readiness are complete.
 
 ## Current Mode
 
-- P3.1 provider integration audit complete; P3.2 provider-construction handoff preparation.
-- Active next implementation target: P3.2 thin TradingAgents `vscode` provider boundary.
+- P3.3c full-graph smoke harness readiness is complete; the next target is live execution against a running VS Code gateway/model.
 - Local workspace path cleanup is complete: the repository has been reopened at `C:\VSCode\Tauric\TradingAgents`, hardcoded project text references now use the no-space path, and the repo-local `.venv` was rebuilt at the new path.
-- G0 commit/push approval has been received; only the approved scope should be staged, committed, and pushed to `origin`.
+- G0 has been committed and pushed to `origin/main` as `10a4a5d`.
 
 ## Active Decisions
 
@@ -61,16 +60,24 @@
 - P2.4 Python SDK LangChain-compatible adapter is complete in `packages/llm-gateway-python`: optional `langchain` extra, lightweight root import boundary, `llm_gateway.langchain_adapter.GatewayChatModel`, LangChain `invoke()` and `stream()` paths through native `GatewayClient.chat()` and `GatewayClient.stream_chat()`, prompt-template/message-role mapping, text block normalization, token-safe stream errors, and explicit `NotImplementedError` deferrals for structured output and native tool calling.
 - P2.4 verification passed: editable install with `[langchain]`, package-local pytest (`73 passed`), import smoke (`0.0.1` and `GatewayChatModel`), `git diff --check -- packages/llm-gateway-python`, forbidden boundary/facade-term scan after generated artifact cleanup, artifact scan clean, diagnostics clean, and PhD Critic implementation approval with no required patch. Validation is targeted/mocked adapter coverage, not a live gateway or TradingAgents provider run.
 - P3.1 TradingAgents provider integration audit is complete in `docs/reference/tradingagents-vscode-provider-audit.md`: the next patch should add a lazy optional `vscode` client/factory path, CLI custom model-ID selection, and token/base-url configuration through `TRADINGAGENTS_VSCODE_GATEWAY_URL` and `TRADINGAGENTS_VSCODE_GATEWAY_TOKEN`; P3.2 may defer analyst smoke, but must not claim a full analyst run works until tool calling or a valid post-analyst bypass exists.
+- P3.2 TradingAgents `vscode` provider boundary is complete: `VSCodeClient` resolves gateway URL/token from constructor or environment, lazily imports the optional SDK/LangChain adapter, factory dispatch accepts provider `vscode`, CLI provider/model selection can choose opaque VS Code model IDs, and validators accept opaque `vscode` model names.
+- P3.2 verification passed: targeted provider/model tests (`12 passed, 37 subtests passed`), structured-agent fallback tests (`11 passed`), full root pytest (`101 passed, 40 subtests passed`), `git diff --check`, and PhD Critic Codex implementation review approved with no required patch.
+- P3.3a TradingAgents VS Code provider smoke is complete: `scripts/smoke_vscode_provider.py` validates gateway env/model/prompt input, constructs provider `vscode`, supports construction-only and direct `llm.invoke(...)` modes, and redacts the configured token from failures and assistant output. The operator runbook lives at `docs/runbooks/tradingagents-vscode-provider.md` and remains explicit that full analyst graph execution is still blocked.
+- P3.3a verification passed: smoke-script tests (`14 passed`), combined provider/model tests (`26 passed, 37 subtests passed`), full root pytest (`115 passed, 40 subtests passed`), `git diff --check`, diagnostics on changed files, and PhD Critic implementation review approved with no blocking findings. No live operator gateway smoke was run for P3.3a in this session.
+- P3.3b native non-stream tool-call roundtrip is implemented and review-approved: the VS Code gateway accepts native `tools`, assistant `toolCalls`, and `role: "tool"` messages for `/v1/chat/completions`; rejects OpenAI-shaped tool fields; keeps `/v1/chat/completions/stream` text-only; the Python SDK serializes/parses the native tool contract; and `GatewayChatModel.bind_tools()` returns a bound clone that maps LangChain tools, `AIMessage.tool_calls`, and `ToolMessage` values to the native gateway contract.
+- P3.3b verification passed: VS Code gateway `npm run check`, `npm run compile`, and `npm test --if-present` (`48` tests); SDK package tests (`89 passed`); targeted TradingAgents provider/structured tests (`37 passed, 37 subtests passed`); full root pytest (`115 passed, 40 subtests passed`); diagnostics on scoped files; and PhD Critic implementation review approved with no blocking findings. `git diff --check` reported only Git's line-ending warning for `docs/reference/gateway-api-draft.md`, not whitespace errors. No live VS Code model tool-call run or full one-ticker TradingAgents smoke was run for P3.3b.
+- P3.3c harness readiness is implemented and review-approved: `scripts/smoke_vscode_tradingagents_graph.py` validates gateway env, model, ticker, ISO trade date, analyst list, output root, and round counts; builds an isolated `vscode` `TradingAgentsGraph` config; runs `propagate(ticker, trade_date)`; checks selected analyst reports plus `investment_plan`, `trader_investment_plan`, `final_trade_decision`, and processed decision; and prints token-redacted concise evidence with field character counts instead of report bodies.
+- P3.3c harness readiness verification passed: focused provider/harness tests (`50 passed`), full root pytest (`142 passed, 40 subtests passed`), VS Code gateway package `npm run check`, `npm run compile`, and `npm test --if-present` (`48` tests), SDK package tests (`89 passed`), diagnostics on touched files, scoped `git diff --check`, and PhD Critic implementation review approved with no blocking findings. Full `git diff --check` still reports only Git's existing LF-to-CRLF warning for `docs/reference/gateway-api-draft.md`. No live P3.3c full-graph smoke was run because no gateway env values were configured and localhost scans found no gateway `/health` endpoint.
 
 ## Known Blockers
 
-- G0 approval has been received; stage, commit, and push only the approved G0 scope to `origin`.
-- A full `vscode` provider TradingAgents run through analyst agents is blocked until native gateway tool calling or a TradingAgents-specific analyst fallback exists.
+- A live full `vscode` provider TradingAgents one-ticker run remains unproven until it is executed against a running VS Code gateway/model.
+- Current terminal has no `TRADINGAGENTS_VSCODE_GATEWAY_URL` or `TRADINGAGENTS_VSCODE_GATEWAY_TOKEN`; localhost gateway scans during this session found no public gateway `/health` endpoint.
 
 ## Next Actions
 
-- Prepare the P3.2 thin `vscode` provider boundary ledger from `docs/reference/tradingagents-vscode-provider-audit.md`; keep it provider-construction focused and do not claim full analyst smoke support until tool calling is addressed.
-- Complete approved G0 commit/push, then prepare the P3.2 thin `vscode` provider boundary ledger from `docs/reference/tradingagents-vscode-provider-audit.md`.
+- Start the VS Code gateway from an Extension Development Host, copy the gateway token, set `TRADINGAGENTS_VSCODE_GATEWAY_URL` and `TRADINGAGENTS_VSCODE_GATEWAY_TOKEN`, list `/v1/models`, then run `scripts/smoke_vscode_tradingagents_graph.py --model <model-id>`.
+- Do not claim full analyst smoke support until the P3.3c full-graph harness exits successfully against a real gateway/model and the evidence is recorded.
 
 ## Resume Pointers
 

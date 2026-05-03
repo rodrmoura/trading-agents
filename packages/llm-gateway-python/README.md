@@ -2,16 +2,16 @@
 
 Generic Python SDK for the native VS Code LLM gateway.
 
-Current P2.4 scope:
+Current P3.3b scope:
 
 - package-local `pyproject.toml` for the `llm-gateway` distribution
 - importable `llm_gateway` source package
-- shallow native gateway data types for health, models, chat, and stream events
+- shallow native gateway data types for health, models, chat, stream events, native tools, and native tool calls
 - redacting client configuration
 - blocking standard-library HTTP calls for `/health`, `/v1/models`, `/v1/chat/completions`, and `/v1/chat/completions/stream`
 - synchronous native SSE streaming through `GatewayClient.stream_chat()`
 - typed native gateway errors, malformed-response errors, and transport errors
-- optional LangChain Core adapter through `llm_gateway.langchain_adapter.GatewayChatModel`
+- optional LangChain Core adapter through `llm_gateway.langchain_adapter.GatewayChatModel`, including non-streaming `bind_tools()` support
 - package-local tests for metadata, imports, boundaries, redaction, HTTP behavior, native error mapping, SSE parsing, stream cleanup, and LangChain adapter behavior
 
 This package should remain generic and avoid finance assumptions.
@@ -50,7 +50,15 @@ From `packages/llm-gateway-python/`:
 ## Import Smoke
 
 ```python
-from llm_gateway import ChatMessage, ChatRequest, GatewayClient, GatewayClientConfig, StreamChunkEvent
+from llm_gateway import (
+    ChatMessage,
+    ChatRequest,
+    GatewayClient,
+    GatewayClientConfig,
+    GatewayTool,
+    GatewayToolCall,
+    StreamChunkEvent,
+)
 
 config = GatewayClientConfig(
     base_url="http://127.0.0.1:<port>",
@@ -69,6 +77,22 @@ response = client.chat(
     )
 )
 
+tool_response = client.chat(
+    ChatRequest(
+        model=models[0].id,
+        messages=[ChatMessage(role="user", content="Fetch MSFT data.")],
+        tools=[
+            GatewayTool(
+                name="get_stock_data",
+                description="Fetch stock data.",
+                input_schema={"type": "object", "properties": {"ticker": {"type": "string"}}},
+            )
+        ],
+    )
+)
+for tool_call in tool_response.message.tool_calls:
+    assert isinstance(tool_call, GatewayToolCall)
+
 for event in client.stream_chat(
     ChatRequest(
         model=models[0].id,
@@ -86,6 +110,14 @@ The adapter is optional and package-local:
 ```python
 from llm_gateway import GatewayClient, GatewayClientConfig
 from llm_gateway.langchain_adapter import GatewayChatModel
+from langchain_core.messages import ToolMessage
+from langchain_core.tools import tool
+
+
+@tool
+def get_stock_data(ticker: str) -> str:
+    """Fetch stock data for a ticker."""
+    return "tool output text"
 
 client = GatewayClient(
     GatewayClientConfig(
@@ -98,25 +130,35 @@ chat_model = GatewayChatModel(client=client, model="<model-id>")
 message = chat_model.invoke("Hello")
 print(message.content)
 
+tool_bound_model = chat_model.bind_tools([get_stock_data])
+tool_message = tool_bound_model.invoke("Fetch MSFT data.")
+for tool_call in tool_message.tool_calls:
+    result = get_stock_data.invoke(tool_call["args"])
+    follow_up = tool_bound_model.invoke(
+        [tool_message, ToolMessage(content=result, tool_call_id=tool_call["id"])]
+    )
+
 for chunk in chat_model.stream("Stream hello"):
     if chunk.content:
         print(chunk.content, end="")
 ```
 
-`GatewayChatModel` converts LangChain system, human/user, and assistant messages to native gateway `ChatMessage` values, then calls `GatewayClient.chat()` or `GatewayClient.stream_chat()` with a native `ChatRequest`. String content is passed through unchanged. LangChain text blocks are normalized into plain text, and unsupported roles or content shapes fail before sending a request.
+`GatewayChatModel` converts LangChain system, human/user, assistant, and tool messages to native gateway `ChatMessage` values, then calls `GatewayClient.chat()` or `GatewayClient.stream_chat()` with a native `ChatRequest`. String content is passed through unchanged. LangChain text blocks are normalized into plain text, and unsupported roles or content shapes fail before sending a request.
+
+`GatewayChatModel.bind_tools(tools)` supports non-streaming native tool-call roundtrips. It accepts real LangChain tools, converts them internally with LangChain Core's OpenAI tool converter, and sends only native gateway tool fields: `name`, `description`, and `inputSchema`. Empty `bind_tools([])` returns a clone that omits `tools` from native requests. `tool_choice=None` and `tool_choice="auto"` use default gateway behavior; required, named, or other tool-choice modes are rejected until implemented. Native gateway `toolCalls` become LangChain `AIMessage.tool_calls` shaped for LangGraph `ToolNode`, and prior `AIMessage.tool_calls` plus `ToolMessage` values serialize back to native assistant `toolCalls` and `role: "tool"` messages.
 
 Non-empty stop sequences and unsupported generation options fail explicitly because the native gateway contract does not expose those request fields. Adapter string representations and identifying parameters do not expose bearer tokens.
 
 Structured output is not supported by the native gateway contract yet. `with_structured_output(...)` raises `NotImplementedError`; callers should catch it and fall back to free-text `invoke()` until a native structured-output contract exists.
 
-Native gateway tool calling is deferred. `bind_tools(...)` raises `NotImplementedError` so callers do not receive misleading empty tool results.
+Tool-enabled streaming is not supported yet. `GatewayClient.stream_chat()` rejects requests containing `tools`, prior assistant `tool_calls`, or tool result messages before opening HTTP. Use non-streaming `invoke()` for `bind_tools()` roundtrips.
 
 ## Client Behavior
 
 - `health()` performs public `GET /health` and does not send an authorization header.
 - `list_models()` performs protected `GET /v1/models` with `Authorization: Bearer <gateway-token>`.
 - `chat()` performs protected `POST /v1/chat/completions` with native UTF-8 JSON.
-- `stream_chat()` validates that a non-empty token is configured, then returns a blocking synchronous iterator over native SSE events from protected `POST /v1/chat/completions/stream`.
+- `stream_chat()` validates that a non-empty token is configured, rejects tool-enabled requests, then returns a blocking synchronous iterator over native SSE events from protected `POST /v1/chat/completions/stream`.
 - Protected methods require a non-empty token before network I/O.
 - Native error envelopes are raised as `GatewayRequestError` with status, code, request ID, and metadata preserved.
 - Malformed gateway payloads raise `GatewayResponseError`; local HTTP failures raise `GatewayTransportError`.

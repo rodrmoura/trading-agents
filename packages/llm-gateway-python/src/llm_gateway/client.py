@@ -18,6 +18,7 @@ from .errors import (
 )
 from .types import ChatRequest, ChatResponse, ChatStreamEvent, GatewayHealth, GatewayModel
 from .types import ChatMessage, GatewayModelCapabilities
+from .types import GatewayTool, GatewayToolCall
 from .types import StreamChunkEvent, StreamDoneEvent, StreamErrorEvent
 
 
@@ -70,6 +71,13 @@ def _required_sequence(payload: dict[str, object], field_name: str, context: str
 def _required_str(payload: dict[str, object], field_name: str, context: str) -> str:
     value = payload.get(field_name, _MISSING)
     if not isinstance(value, str):
+        raise GatewayResponseError(f"Gateway returned malformed {context}.")
+    return value
+
+
+def _required_nonblank_str(payload: dict[str, object], field_name: str, context: str) -> str:
+    value = _required_str(payload, field_name, context)
+    if value.strip() == "":
         raise GatewayResponseError(f"Gateway returned malformed {context}.")
     return value
 
@@ -166,6 +174,7 @@ class GatewayClient:
 
     def stream_chat(self, request: ChatRequest) -> Iterator[ChatStreamEvent]:
         token = self._require_token()
+        _reject_tool_enabled_stream_request(request)
         body = _serialize_chat_request(request)
         return self._stream_chat_events(body, token)
 
@@ -455,17 +464,55 @@ def _parse_model(value: object) -> GatewayModel:
     )
 
 
+def _serialize_tool_call(tool_call: GatewayToolCall) -> dict[str, object]:
+    return {
+        "id": tool_call.id,
+        "name": tool_call.name,
+        "input": dict(tool_call.input),
+    }
+
+
+def _serialize_chat_message(message: ChatMessage) -> dict[str, object]:
+    if message.role == "tool":
+        payload: dict[str, object] = {"role": "tool", "content": message.content}
+        if message.tool_call_id is not None:
+            payload["toolCallId"] = message.tool_call_id
+        return payload
+
+    payload = {"role": message.role, "content": message.content}
+    if message.tool_calls:
+        payload["toolCalls"] = [_serialize_tool_call(tool_call) for tool_call in message.tool_calls]
+    return payload
+
+
+def _serialize_tool(tool: GatewayTool) -> dict[str, object]:
+    return {
+        "name": tool.name,
+        "description": tool.description,
+        "inputSchema": dict(tool.input_schema),
+    }
+
+
+def _reject_tool_enabled_stream_request(request: ChatRequest) -> None:
+    if request.tools:
+        raise GatewayConfigurationError("Native gateway streaming does not support tools yet.")
+
+    for message in request.messages:
+        if message.role == "tool" or message.tool_calls:
+            raise GatewayConfigurationError("Native gateway streaming does not support tools yet.")
+
+
 def _serialize_chat_request(request: ChatRequest) -> dict[str, object]:
     payload: dict[str, object] = {
         "model": request.model,
-        "messages": [
-            {"role": message.role, "content": message.content} for message in request.messages
-        ],
+        "messages": [_serialize_chat_message(message) for message in request.messages],
     }
     if request.request_id is not None:
         payload["requestId"] = request.request_id
     if request.metadata:
         payload["metadata"] = dict(request.metadata)
+    if request.tools:
+        payload["tools"] = [_serialize_tool(tool) for tool in request.tools]
     return payload
 
 
@@ -475,7 +522,10 @@ def _parse_chat_response(value: object) -> ChatResponse:
     if message.role != "assistant":
         raise GatewayResponseError("Gateway returned malformed chat response.")
     finish_reason = _required_str(payload, "finishReason", "chat response")
-    if finish_reason != "stop":
+    has_tool_calls = bool(message.tool_calls)
+    if has_tool_calls and finish_reason != "toolCalls":
+        raise GatewayResponseError("Gateway returned malformed chat response.")
+    if not has_tool_calls and finish_reason != "stop":
         raise GatewayResponseError("Gateway returned malformed chat response.")
     usage = payload.get("usage", _MISSING)
     if usage is not None:
@@ -486,14 +536,37 @@ def _parse_chat_response(value: object) -> ChatResponse:
         model=_required_str(payload, "model", "chat response"),
         created=_required_str(payload, "created", "chat response"),
         message=message,
-        finish_reason="stop",
+        finish_reason=finish_reason,
         usage=None,
         metadata=_required_mapping(payload, "metadata", "chat response"),
     )
 
 
+def _parse_tool_call(value: object) -> GatewayToolCall:
+    payload = _as_mapping(value, "chat response tool call")
+    input_value = _required_mapping(payload, "input", "chat response tool call")
+    return GatewayToolCall(
+        id=_required_nonblank_str(payload, "id", "chat response tool call"),
+        name=_required_nonblank_str(payload, "name", "chat response tool call"),
+        input=input_value,
+    )
+
+
+def _parse_tool_calls(payload: dict[str, object]) -> tuple[GatewayToolCall, ...]:
+    value = payload.get("toolCalls", _MISSING)
+    if value is _MISSING:
+        return ()
+    if not isinstance(value, list) or not value:
+        raise GatewayResponseError("Gateway returned malformed chat message.")
+    return tuple(_parse_tool_call(item) for item in value)
+
+
 def _parse_chat_message(payload: dict[str, object]) -> ChatMessage:
     role = _required_str(payload, "role", "chat message")
-    if role not in {"system", "user", "assistant"}:
+    if role not in {"system", "user", "assistant", "tool"}:
         raise GatewayResponseError("Gateway returned malformed chat message.")
-    return ChatMessage(role=role, content=_required_str(payload, "content", "chat message"))
+    return ChatMessage(
+        role=role,
+        content=_required_str(payload, "content", "chat message"),
+        tool_calls=_parse_tool_calls(payload),
+    )

@@ -1,8 +1,8 @@
 # VS Code LLM Gateway
 
-P1.5 implements local gateway lifecycle, authenticated model listing, authenticated native non-stream chat invocation, and authenticated native SSE chat streaming for Phase 1.
+P3.3b implements local gateway lifecycle, authenticated model listing, authenticated native non-stream chat invocation with tool-call roundtrip support, and authenticated native text-only SSE chat streaming.
 
-Current behavior in P1.5:
+Current behavior:
 
 - start/stop/status/copy-token command wiring
 - local HTTP server bound to `127.0.0.1` on an ephemeral port
@@ -11,8 +11,8 @@ Current behavior in P1.5:
 - public `GET /health` endpoint without token disclosure
 - authenticated `POST /shutdown` endpoint that sends a complete success response before stop
 - authenticated `GET /v1/models` endpoint returning mapped VS Code model metadata
-- authenticated `POST /v1/chat/completions` endpoint with strict native JSON validation and non-stream plain-text responses
-- authenticated `POST /v1/chat/completions/stream` endpoint with native Server-Sent Events (`chunk`, `done`, `error`)
+- authenticated `POST /v1/chat/completions` endpoint with strict native JSON validation, plain-text responses, and native assistant tool-call responses
+- authenticated `POST /v1/chat/completions/stream` endpoint with native text-only Server-Sent Events (`chunk`, `done`, `error`)
 - sanitized native JSON errors with no stack or secret disclosure
 
 This package should not import TradingAgents.
@@ -59,12 +59,37 @@ Native non-stream chat request (strict top-level/message field allowlist):
   "model": "opaque-vscode-model-id",
   "messages": [
     { "role": "system", "content": "Optional system instruction" },
-    { "role": "user", "content": "Hello" }
+    { "role": "user", "content": "Hello" },
+    {
+      "role": "assistant",
+      "content": "",
+      "toolCalls": [
+        { "id": "call_1", "name": "get_stock_data", "input": { "ticker": "MSFT" } }
+      ]
+    },
+    { "role": "tool", "toolCallId": "call_1", "content": "tool output text" }
+  ],
+  "tools": [
+    {
+      "name": "get_stock_data",
+      "description": "Fetch stock data.",
+      "inputSchema": { "type": "object", "properties": { "ticker": { "type": "string" } } }
+    }
   ],
   "requestId": "optional-client-id",
   "metadata": {}
 }
 ```
+
+Native tool contract:
+
+- Top-level request keys are exactly `model`, `messages`, `requestId`, `metadata`, and optional `tools`.
+- `tools`, when present, must be a non-empty array of `{ "name", "description", "inputSchema" }` objects. `name` must be nonblank, `description` must be a string, and `inputSchema`, when present, must be a JSON object.
+- Tool objects reject sibling `type`, `function`, and `parameters` keys. JSON Schema keys inside `inputSchema`, such as `inputSchema.type`, are valid.
+- Text messages use `{ "role": "system" | "user" | "assistant", "content": "text" }`; content must be nonblank except assistant content may be `""` when `toolCalls` is non-empty.
+- Prior assistant tool-call context uses native `toolCalls` with nonblank `id` and `name` plus object `input`.
+- Tool results use `{ "role": "tool", "toolCallId": "call_1", "content": "tool output text" }`.
+- OpenAI-style fields such as `tool_calls`, `tool_call_id`, `function`, `arguments`, and wrapper tool fields are rejected by the native contract.
 
 Native non-stream chat response:
 
@@ -83,7 +108,29 @@ Native non-stream chat response:
 }
 ```
 
-Native streaming chat request uses the same strict request shape as non-stream chat.
+Native non-stream tool-call response:
+
+```json
+{
+  "id": "gwchat_opaque-id",
+  "model": "opaque-vscode-model-id",
+  "created": "2026-05-01T00:00:00.000Z",
+  "message": {
+    "role": "assistant",
+    "content": "",
+    "toolCalls": [
+      { "id": "call_1", "name": "get_stock_data", "input": { "ticker": "MSFT" } }
+    ]
+  },
+  "finishReason": "toolCalls",
+  "usage": null,
+  "metadata": {}
+}
+```
+
+`finishReason` is `"toolCalls"` exactly when returned `toolCalls` is non-empty; otherwise it is `"stop"`. The extension never executes returned tool calls. Local callers, such as LangGraph `ToolNode`, execute tools and send native assistant `toolCalls` plus `role: "tool"` results on the next non-streaming model turn.
+
+Native streaming chat request uses the same strict text-only request shape as non-stream chat but does not support tool context yet. `/v1/chat/completions/stream` rejects top-level `tools`, assistant `toolCalls`, and `role: "tool"` messages with `validation_error` before model invocation.
 
 Native streaming response events (SSE):
 
@@ -114,7 +161,7 @@ Validation highlights:
 - rejects malformed or empty JSON with `400 invalid_json`
 - rejects request bodies over 1 MiB with `400 validation_error`
 - rejects unknown top-level or message fields with `400 validation_error`
-- accepts message roles `system`, `user`, `assistant`; system messages are converted to provider user messages with `System instructions:\n` prefix
+- accepts message roles `system`, `user`, `assistant`, and non-stream `tool`; system messages are converted to provider user messages with `System instructions:\n` prefix
 
 Model object shape:
 

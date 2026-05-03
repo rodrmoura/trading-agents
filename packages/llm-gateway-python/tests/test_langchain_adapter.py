@@ -14,8 +14,10 @@ from langchain_core.messages import (
     ChatMessage as LangChainChatMessage,
     HumanMessage,
     SystemMessage,
+    ToolMessage,
 )
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import tool
 
 from llm_gateway import (
     ChatMessage,
@@ -26,6 +28,7 @@ from llm_gateway import (
     GatewayConfigurationError,
     GatewayErrorPayload,
     GatewayRequestError,
+    GatewayToolCall,
     StreamChunkEvent,
     StreamDoneEvent,
     StreamErrorEvent,
@@ -36,7 +39,7 @@ class FakeGatewayClient(GatewayClient):
     def __init__(
         self,
         *,
-        responses: Iterable[str] = ("Gateway response",),
+        responses: Iterable[str | ChatResponse] = ("Gateway response",),
         stream_events: Iterable[object] = (),
         token: str = "synthetic-token",
     ) -> None:
@@ -47,12 +50,14 @@ class FakeGatewayClient(GatewayClient):
 
     def chat(self, request: ChatRequest) -> ChatResponse:
         self.requests.append(request)
-        content = self._responses.pop(0) if self._responses else "Gateway response"
+        next_response = self._responses.pop(0) if self._responses else "Gateway response"
+        if isinstance(next_response, ChatResponse):
+            return next_response
         return ChatResponse(
             id="gwchat_test",
             model=request.model,
             created="2026-05-01T00:00:00.000Z",
-            message=ChatMessage(role="assistant", content=content),
+            message=ChatMessage(role="assistant", content=next_response),
             finish_reason="stop",
         )
 
@@ -65,6 +70,12 @@ def make_model(client: FakeGatewayClient | None = None):
     from llm_gateway.langchain_adapter import GatewayChatModel
 
     return GatewayChatModel(client=client or FakeGatewayClient(), model="model-id")
+
+
+@tool
+def get_stock_data(ticker: str) -> str:
+    """Fetch stock data for a ticker."""
+    return f"data for {ticker}"
 
 
 def test_root_import_remains_lightweight_without_adapter_module() -> None:
@@ -277,10 +288,121 @@ def test_structured_output_deferred_and_fallback_to_free_text_invoke() -> None:
     assert message.content == "Fallback answer"
 
 
-def test_bind_tools_raises_clear_deferred_error() -> None:
+def test_bind_tools_with_real_tool_sends_native_tool_definitions() -> None:
+    client = FakeGatewayClient(responses=("Tool-ready answer",))
+    adapter = make_model(client).bind_tools([get_stock_data])
+
+    message = adapter.invoke("Use a tool if needed.")
+
+    assert message.content == "Tool-ready answer"
+    assert len(client.requests) == 1
+    assert len(client.requests[0].tools) == 1
+    native_tool = client.requests[0].tools[0]
+    assert native_tool.name == "get_stock_data"
+    assert native_tool.description == "Fetch stock data for a ticker."
+    assert native_tool.input_schema["type"] == "object"
+    assert "ticker" in native_tool.input_schema["properties"]
+    assert not hasattr(native_tool, "function")
+    assert not hasattr(native_tool, "parameters")
+
+
+def test_bind_tools_empty_returns_clone_that_omits_native_tools() -> None:
+    client = FakeGatewayClient(responses=("No tools answer",))
+    adapter = make_model(client)
+    bound = adapter.bind_tools([])
+
+    assert bound is not adapter
+    bound.invoke("Hello")
+
+    assert client.requests == [
+        ChatRequest(model="model-id", messages=[ChatMessage(role="user", content="Hello")])
+    ]
+
+
+def test_native_response_tool_calls_become_langchain_ai_message_tool_calls() -> None:
+    response = ChatResponse(
+        id="gwchat_tool",
+        model="model-id",
+        created="2026-05-01T00:00:00.000Z",
+        message=ChatMessage(
+            role="assistant",
+            content="",
+            tool_calls=(
+                GatewayToolCall(id="call_1", name="get_stock_data", input={"ticker": "MSFT"}),
+            ),
+        ),
+        finish_reason="toolCalls",
+    )
+    adapter = make_model(FakeGatewayClient(responses=(response,)))
+
+    message = adapter.invoke("Fetch data.")
+
+    assert isinstance(message, AIMessage)
+    assert message.content == ""
+    assert message.tool_calls == [
+        {"name": "get_stock_data", "args": {"ticker": "MSFT"}, "id": "call_1", "type": "tool_call"}
+    ]
+    assert message.response_metadata["finish_reason"] == "toolCalls"
+
+
+def test_prior_ai_tool_calls_and_tool_messages_serialize_to_native_messages() -> None:
+    client = FakeGatewayClient()
+    adapter = make_model(client).bind_tools([get_stock_data])
+
+    adapter.invoke(
+        [
+            HumanMessage(content="Fetch MSFT."),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "get_stock_data",
+                        "args": {"ticker": "MSFT"},
+                        "id": "call_1",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            ToolMessage(content="price=123", tool_call_id="call_1"),
+        ]
+    )
+
+    assert list(client.requests[0].messages) == [
+        ChatMessage(role="user", content="Fetch MSFT."),
+        ChatMessage(
+            role="assistant",
+            content="",
+            tool_calls=(GatewayToolCall(id="call_1", name="get_stock_data", input={"ticker": "MSFT"}),),
+        ),
+        ChatMessage(role="tool", content="price=123", tool_call_id="call_1"),
+    ]
+    assert client.requests[0].tools[0].name == "get_stock_data"
+
+
+def test_bind_tools_accepts_auto_tool_choice() -> None:
+    client = FakeGatewayClient(responses=("Auto answer",))
+    adapter = make_model(client).bind_tools([get_stock_data], tool_choice="auto")
+
+    assert adapter.invoke("Hello").content == "Auto answer"
+    assert client.requests[0].tools[0].name == "get_stock_data"
+
+
+def test_bind_tools_rejects_unsupported_tool_choice_without_prompt_leakage() -> None:
     adapter = make_model()
+    prompt_text = "private prompt text"
 
     with pytest.raises(NotImplementedError) as error_info:
-        adapter.bind_tools([])
+        adapter.bind_tools([get_stock_data], tool_choice="required")
 
-    assert "deferred" in str(error_info.value)
+    assert prompt_text not in str(error_info.value)
+
+
+def test_bind_tools_rejects_unsupported_kwargs_without_prompt_leakage() -> None:
+    adapter = make_model()
+    prompt_text = "private prompt text"
+
+    with pytest.raises(ValueError) as error_info:
+        adapter.bind_tools([get_stock_data], parallel_tool_calls=False)
+
+    assert "parallel_tool_calls" in str(error_info.value)
+    assert prompt_text not in str(error_info.value)

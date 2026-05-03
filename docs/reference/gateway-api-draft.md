@@ -1,6 +1,6 @@
 # Gateway API Draft
 
-This is a draft contract for the VS Code LLM gateway. It is not yet implemented.
+This is the draft/native contract for the VS Code LLM gateway. Phase 1 text chat and P3.3b non-streaming native tool-call roundtrip are implemented; later structured-output and OpenAI-compatible facade work remains separate.
 
 ## Goals
 
@@ -33,20 +33,21 @@ POST /shutdown
 
 Current direction: implement a native minimal API first, then add an OpenAI-compatible facade later if the native path proves useful.
 
-## Phase 1 Locked Contract
+## Native Locked Contract
 
-Phase 1 uses a native minimal API only. Do not implement an OpenAI-compatible facade, tool calling, structured-output enforcement, WebSockets, newline-delimited JSON streaming, or permissive CORS in Phase 1.
+The gateway uses a native minimal API only. Do not implement an OpenAI-compatible facade, structured-output enforcement, WebSockets, newline-delimited JSON streaming, or permissive CORS in the native gateway path.
 
-The `/v1/chat/completions` path name does not imply OpenAI API compatibility in Phase 1. Do not return OpenAI-style `choices`, `delta`, `usage` objects beyond the locked native `usage: null`, tool call arrays, or `[DONE]` sentinels.
+The `/v1/chat/completions` path name does not imply OpenAI API compatibility. Do not return OpenAI-style response wrappers, streaming sentinels, or OpenAI tool field names. The native non-streaming response keeps the locked `usage: null` field and uses native `message.toolCalls` only when the model returns tool calls.
 
 Endpoint semantics:
 
 - `GET /health` is public and returns only non-sensitive gateway status.
 - `GET /v1/models` requires `Authorization: Bearer <gateway-token>`.
-- `POST /v1/chat/completions` requires bearer auth and is non-streaming only.
-- `POST /v1/chat/completions/stream` requires bearer auth and is the only Phase 1 streaming entrypoint.
+- `POST /v1/chat/completions` requires bearer auth and is non-streaming only. It supports native tool-call request/response roundtrips.
+- `POST /v1/chat/completions/stream` requires bearer auth and is text-only in P3.3b.
 - `POST /shutdown` requires bearer auth. The VS Code stop command is still the primary shutdown path.
 - `POST /v1/chat/completions` rejects `stream` and other unknown top-level fields with `validation_error`.
+- `POST /v1/chat/completions/stream` rejects top-level `tools`, assistant `toolCalls`, and `role: "tool"` messages with `validation_error` before model invocation.
 - Wrong methods for known endpoints return `405 method_not_allowed` through the native error envelope.
 - In P1.2, known future protected paths may return `501 not_implemented`, but only after bearer auth succeeds.
 
@@ -122,7 +123,7 @@ Model object rules:
 - `name` falls back to `id` when no display name is available.
 - `vendor`, `family`, `version`, and token-limit fields are optional or nullable when VS Code does not expose them through the stable API.
 - The gateway accepts chat requests only for model IDs returned by the current `/v1/models` result.
-- Capability flags default conservatively. `structuredOutput` is always `false` in Phase 1. `toolCalling` is `false` unless stable VS Code model metadata explicitly says otherwise. `streaming` is `false` until the Phase 1 streaming endpoint is implemented, then `true` for models that can use the gateway stream path.
+- Capability flags default conservatively. `structuredOutput` remains `false`. `/v1/models` may continue reporting `toolCalling: false` until reliable VS Code model capability detection exists, even though the native non-streaming transport can carry tool calls. `streaming` is `true` for models that can use the gateway stream path.
 
 ## Native Chat Request
 
@@ -131,7 +132,22 @@ Model object rules:
   "model": "opaque-vscode-model-id",
   "messages": [
     { "role": "system", "content": "Optional system instruction" },
-    { "role": "user", "content": "Hello" }
+    { "role": "user", "content": "Hello" },
+    {
+      "role": "assistant",
+      "content": "",
+      "toolCalls": [
+        { "id": "call_1", "name": "get_stock_data", "input": { "ticker": "MSFT" } }
+      ]
+    },
+    { "role": "tool", "toolCallId": "call_1", "content": "tool output text" }
+  ],
+  "tools": [
+    {
+      "name": "get_stock_data",
+      "description": "Fetch stock data.",
+      "inputSchema": { "type": "object", "properties": { "ticker": { "type": "string" } } }
+    }
   ],
   "requestId": "optional-client-request-id",
   "metadata": {}
@@ -142,12 +158,16 @@ Validation rules:
 
 - `Content-Type` for chat POST endpoints must be `application/json` or an `application/json` variant.
 - Request bodies larger than 1 MiB are rejected.
-- Unknown top-level fields are rejected in Phase 1.
-- Unknown message object fields are rejected in Phase 1.
+- Top-level keys are exactly `model`, `messages`, optional `requestId`, optional `metadata`, and optional `tools`.
 - `model` is required and must be a non-empty string.
 - `messages` is required and must contain at least one item.
-- Message `role` must be `system`, `user`, or `assistant`.
-- Message `content` must be a non-empty string.
+- Text message `role` must be `system`, `user`, or `assistant`, and `content` must be a non-empty string.
+- Assistant messages may include native `toolCalls`; when present, `toolCalls` must be a non-empty array and assistant `content` may be an empty string.
+- Each native tool call is `{ "id": "call_1", "name": "get_stock_data", "input": { ... } }`; `id` and `name` must be nonblank strings, and `input` must be an object.
+- Tool result messages are `{ "role": "tool", "toolCallId": "call_1", "content": "tool output text" }`; `toolCallId` must be nonblank and `content` must be a string.
+- `tools`, when present, must be a non-empty array of native tool objects. Each tool must have nonblank string `name`, string `description`, and optional object `inputSchema`.
+- Native tool objects reject sibling `type`, `function`, and `parameters` keys. JSON Schema keywords such as `inputSchema.type` are valid inside `inputSchema`.
+- OpenAI-style message fields `tool_calls`, `tool_call_id`, `function`, and `arguments` are invalid.
 - `metadata`, when present, must be a JSON object.
 - `requestId`, when present, must be a non-empty string.
 - Empty POST bodies are invalid for chat endpoints. Malformed JSON returns `invalid_json`. Oversized bodies return `validation_error` unless the implementation adds a more specific sanitized error code later.
@@ -169,11 +189,31 @@ Validation rules:
 }
 ```
 
-Phase 1 treats model output as plain text. Structured output normalization belongs in a later adapter or contract packet.
+Native non-streaming tool-call response:
+
+```json
+{
+  "id": "gwchat_opaque-id",
+  "model": "opaque-vscode-model-id",
+  "created": "2026-05-01T00:00:00.000Z",
+  "message": {
+    "role": "assistant",
+    "content": "",
+    "toolCalls": [
+      { "id": "call_1", "name": "get_stock_data", "input": { "ticker": "MSFT" } }
+    ]
+  },
+  "finishReason": "toolCalls",
+  "usage": null,
+  "metadata": {}
+}
+```
+
+`finishReason` is exactly `"toolCalls"` when `message.toolCalls` is non-empty; otherwise it is exactly `"stop"`. The gateway does not execute returned tool calls. Local clients execute tools and include prior assistant `toolCalls` plus `role: "tool"` results on the next model turn. Structured output normalization belongs in a later adapter or contract packet.
 
 ## Streaming Response
 
-Phase 1 streaming uses Server-Sent Events from `POST /v1/chat/completions/stream`.
+P3.3b streaming uses text-only Server-Sent Events from `POST /v1/chat/completions/stream`. Tool-enabled streaming is not supported yet; the endpoint rejects top-level `tools`, assistant `toolCalls`, and `role: "tool"` messages with `validation_error` before model invocation.
 
 Required response headers:
 
@@ -266,4 +306,5 @@ Status-code mapping:
 
 - Whether to add an OpenAI-compatible facade after the native Phase 1 path works.
 - Whether structured output should become gateway-native or remain adapter-level after Phase 1.
-- How tool calls should be represented after Phase 1 when VS Code model support varies by model.
+- How to detect and advertise reliable per-model tool-calling capability through `/v1/models`.
+- How to support tool-enabled streaming without weakening the native non-streaming contract.

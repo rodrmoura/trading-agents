@@ -12,12 +12,15 @@ This file owns medium-term governance priorities and parked work. Product-specif
 - Treat P2.3 Python gateway SDK streaming client as complete and review-approved.
 - Treat P2.4 Python gateway SDK LangChain-compatible adapter as complete and review-approved.
 - Treat P3.1 TradingAgents provider integration audit as complete.
+- Treat P3.2 thin TradingAgents `vscode` provider boundary as complete and review-approved.
+- Treat P3.3a direct TradingAgents `vscode` provider smoke/runbook as complete and review-approved.
+- Treat P3.3b mocked non-stream native tool-call roundtrip as complete and review-approved.
+- Treat P3.3c full-graph smoke harness readiness as complete and review-approved, but not live proof.
 
 ## Next
 
 - Keep using the phase execution queue in `docs/planning/codex-task-packets.md` for handoffs.
-- Prepare P3.2 thin TradingAgents `vscode` provider boundary as the next handoff.
-- Complete the approved G0 GitHub commit/push, then continue with P3.2.
+- Run and record P3.3c live full one-ticker TradingAgents smoke through VS Code models using the full-graph harness.
 
 ## Later
 

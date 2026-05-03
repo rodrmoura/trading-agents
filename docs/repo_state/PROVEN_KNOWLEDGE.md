@@ -34,9 +34,15 @@
 - On 2026-05-01, P2.2 added blocking standard-library HTTP behavior for SDK `health()`, `list_models()`, and `chat()`.
 - On 2026-05-01, P2.3 added synchronous native SSE streaming behavior for SDK `stream_chat()` with method-call token validation, lazy HTTP open, native `chunk`/`done`/`error` event parsing, and deterministic response close on terminal events, parser failures, transport failures, and explicit iterator close.
 - On 2026-05-01, P2.4 added the optional LangChain Core adapter at `llm_gateway.langchain_adapter.GatewayChatModel`; the root `llm_gateway` import remains lightweight and does not import LangChain Core.
-- The LangChain adapter supports `invoke()` and `stream()` through the native SDK client, maps system/user/human/assistant message roles to native `ChatMessage` values, normalizes text blocks, redacts configured tokens from stream errors, and explicitly defers structured output and native tool calling with `NotImplementedError`.
+- The LangChain adapter supports `invoke()` and `stream()` through the native SDK client, maps system/user/human/assistant message roles to native `ChatMessage` values, normalizes text blocks, redacts configured tokens from stream errors, supports non-stream `bind_tools()` roundtrip through the native gateway tool contract, and explicitly defers structured output with `NotImplementedError`.
 - The Python SDK sends bearer tokens only for protected endpoints, redacts configured tokens from repr/string and SDK exception surfaces, and has no OpenAI facade concepts or TradingAgents/CLI imports.
 - The Python SDK maps native gateway error envelopes to `GatewayRequestError`, malformed native JSON/SSE payloads to `GatewayResponseError`, and local HTTP failures to `GatewayTransportError`.
+- The native gateway tool-call contract is non-stream only: `/v1/chat/completions` accepts native `tools`, assistant `toolCalls`, and `role: "tool"` messages, while `/v1/chat/completions/stream` rejects tool-enabled requests before model invocation.
+- TradingAgents provider `vscode` is now a thin optional boundary: `tradingagents.llm_clients.vscode_client.VSCodeClient` resolves `TRADINGAGENTS_VSCODE_GATEWAY_URL` and `TRADINGAGENTS_VSCODE_GATEWAY_TOKEN`, lazily imports the package-local SDK adapter, returns `GatewayChatModel`, and accepts opaque VS Code model IDs.
+- The interactive CLI now exposes `VS Code Gateway` and prompts for opaque model IDs; it does not discover models dynamically in P3.2.
+- `scripts/smoke_vscode_provider.py` is a direct TradingAgents `vscode` provider smoke: it validates `TRADINGAGENTS_VSCODE_GATEWAY_URL`, `TRADINGAGENTS_VSCODE_GATEWAY_TOKEN`, model, and prompt values; supports `--no-invoke`; can call `GatewayChatModel.invoke()` directly; and redacts the configured token from failure and assistant-output text.
+- `docs/runbooks/tradingagents-vscode-provider.md` owns the operator steps for the direct provider smoke and the P3.3c full-graph harness; it explicitly does not prove a full analyst graph run until the harness succeeds against a real gateway/model.
+- `scripts/smoke_vscode_tradingagents_graph.py` is the repeatable P3.3c full-graph harness: it validates the gateway environment, opaque model ID, ticker, ISO trade date, analysts, output root, and round counts; builds an isolated `vscode` graph config; runs `TradingAgentsGraph(...).propagate(...)`; requires selected analyst reports plus downstream decision fields to be nonblank; and prints only token-redacted concise evidence and field character counts.
 
 ## Reopen Rules
 
@@ -47,7 +53,8 @@
 - Reopen lifecycle command behavior if prompt/skill metadata semantics change.
 - Reopen document ownership if duplicate current-truth stores appear.
 - Reopen gateway stability facts if future live VS Code model smoke fails or if stable VS Code LM API behavior differs from the tested assumptions.
-- Reopen SDK facts if provider integration changes adapter behavior, package metadata, public import names, token redaction behavior, streaming behavior, structured-output/tool-calling support, or the no-OpenAI-facade boundary.
+- Reopen SDK facts if provider integration changes adapter behavior, package metadata, public import names, token redaction behavior, streaming behavior, structured-output/tool-calling support, native tool contract shape, or the no-OpenAI-facade boundary.
+- Reopen `vscode` provider facts if environment variable names, optional dependency policy, CLI selection behavior, factory dispatch, direct smoke behavior, graph smoke harness behavior, runbook setup, or `bind_tools()` support changes.
 
 ## Superseded Or Contested Knowledge
 

@@ -49,6 +49,51 @@ function withTimeout(promise, timeoutMs, message) {
   ]);
 }
 
+function createTestRuntime() {
+  return {
+    createUserMessage(content) {
+      return { role: "user", content };
+    },
+    createAssistantMessage(content) {
+      return { role: "assistant", content };
+    },
+    createAssistantToolCallMessage(content, toolCalls) {
+      return { role: "assistant", content, toolCalls };
+    },
+    createToolResultMessage(toolCallId, content) {
+      return { role: "user", toolResult: { toolCallId, content } };
+    },
+    createTool(tool) {
+      return { ...tool };
+    },
+    extractTextResponsePart(part) {
+      if (typeof part === "string") {
+        return part;
+      }
+      if (part && part.kind === "text") {
+        return part.value;
+      }
+      return null;
+    },
+    extractToolCallResponsePart(part) {
+      if (!part || part.kind !== "toolCall") {
+        return null;
+      }
+      return { id: part.id, name: part.name, input: part.input };
+    },
+    createCancellationSource() {
+      const controller = new AbortController();
+      return {
+        token: controller.signal,
+        cancel() {
+          controller.abort();
+        },
+        dispose() {},
+      };
+    },
+  };
+}
+
 test("stream requires bearer auth before body parsing or model access", async () => {
   let startChatCalls = 0;
 
@@ -274,6 +319,71 @@ test("stream rejects unknown top-level and message fields", async () => {
     });
     assert.equal(invalidMessageToolCalls.status, 400);
     assert.equal((await invalidMessageToolCalls.json()).error.code, "validation_error");
+  } finally {
+    await gateway.stop("command");
+  }
+});
+
+test("stream rejects native tool context before model invocation", async () => {
+  let startChatCalls = 0;
+
+  const gateway = createGatewayController({
+    modelService: {
+      async listModels() {
+        return [];
+      },
+      async startChat() {
+        startChatCalls += 1;
+        throw new Error("should-not-run");
+      },
+      async completeChat() {
+        return "unused";
+      },
+    },
+  });
+
+  await gateway.start();
+
+  try {
+    const bodies = [
+      {
+        ...buildChatBody(),
+        tools: [
+          {
+            name: "get_stock_data",
+            description: "Fetch stock data.",
+            inputSchema: { type: "object" },
+          },
+        ],
+      },
+      {
+        model: "model-alpha",
+        messages: [
+          { role: "user", content: "Hello" },
+          {
+            role: "assistant",
+            content: "",
+            toolCalls: [{ id: "call_1", name: "get_stock_data", input: {} }],
+          },
+        ],
+      },
+      {
+        model: "model-alpha",
+        messages: [
+          { role: "user", content: "Hello" },
+          { role: "tool", toolCallId: "call_1", content: "result" },
+        ],
+      },
+    ];
+
+    for (const body of bodies) {
+      const response = await postStream(gateway, body);
+      assert.equal(response.status, 400);
+      assert.equal(response.headers.get("content-type")?.startsWith("application/json"), true);
+      assert.equal((await response.json()).error.code, "validation_error");
+    }
+
+    assert.equal(startChatCalls, 0);
   } finally {
     await gateway.stop("command");
   }
@@ -580,24 +690,7 @@ test("stream client disconnect aborts model cancellation token/source", async ()
         ];
       },
     },
-    {
-      createUserMessage(content) {
-        return { role: "user", content };
-      },
-      createAssistantMessage(content) {
-        return { role: "assistant", content };
-      },
-      createCancellationSource() {
-        const controller = new AbortController();
-        return {
-          token: controller.signal,
-          cancel() {
-            controller.abort();
-          },
-          dispose() {},
-        };
-      },
-    }
+    createTestRuntime()
   );
 
   const gateway = createGatewayController({ modelService });

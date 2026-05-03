@@ -102,6 +102,51 @@ function withTimeout(promise, timeoutMs, message) {
   ]);
 }
 
+function createTestRuntime() {
+  return {
+    createUserMessage(content) {
+      return { role: "user", content };
+    },
+    createAssistantMessage(content) {
+      return { role: "assistant", content };
+    },
+    createAssistantToolCallMessage(content, toolCalls) {
+      return { role: "assistant", content, toolCalls };
+    },
+    createToolResultMessage(toolCallId, content) {
+      return { role: "user", toolResult: { toolCallId, content } };
+    },
+    createTool(tool) {
+      return { ...tool };
+    },
+    extractTextResponsePart(part) {
+      if (typeof part === "string") {
+        return part;
+      }
+      if (part && part.kind === "text") {
+        return part.value;
+      }
+      return null;
+    },
+    extractToolCallResponsePart(part) {
+      if (!part || part.kind !== "toolCall") {
+        return null;
+      }
+      return { id: part.id, name: part.name, input: part.input };
+    },
+    createCancellationSource() {
+      const controller = new AbortController();
+      return {
+        token: controller.signal,
+        cancel() {
+          controller.abort();
+        },
+        dispose() {},
+      };
+    },
+  };
+}
+
 test("chat requires bearer auth before body parsing or model access", async () => {
   let completeChatCalls = 0;
 
@@ -282,7 +327,6 @@ test("chat rejects unknown top-level and message fields", async () => {
     const invalidTopLevel = [
       { stream: true },
       { temperature: 0.2 },
-      { tools: [] },
       { tool_choice: "auto" },
       { response_format: { type: "json_object" } },
       { extra: 1 },
@@ -307,6 +351,197 @@ test("chat rejects unknown top-level and message fields", async () => {
     });
     assert.equal(invalidMessageToolCalls.status, 400);
     assert.equal((await invalidMessageToolCalls.json()).error.code, "validation_error");
+  } finally {
+    await gateway.stop("command");
+  }
+});
+
+test("chat validation accepts native tools, assistant toolCalls, and tool result messages", async () => {
+  const capturedRequests = [];
+
+  const gateway = createGatewayController({
+    modelService: {
+      async listModels() {
+        return [];
+      },
+      async completeChat(request) {
+        capturedRequests.push(request);
+        return "ok";
+      },
+    },
+  });
+
+  await gateway.start();
+
+  try {
+    const requestBody = {
+      model: "model-alpha",
+      messages: [
+        { role: "system", content: "Use tools when needed." },
+        { role: "user", content: "Fetch data." },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [{ id: "call_1", name: "get_stock_data", input: { ticker: "MSFT" } }],
+        },
+        { role: "tool", toolCallId: "call_1", content: "price=123" },
+      ],
+      tools: [
+        {
+          name: "get_stock_data",
+          description: "Fetch stock data.",
+          inputSchema: { type: "object", properties: { ticker: { type: "string" } } },
+        },
+      ],
+    };
+
+    const response = await postChat(gateway, requestBody);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).message.content, "ok");
+    assert.deepEqual(capturedRequests, [requestBody]);
+  } finally {
+    await gateway.stop("command");
+  }
+});
+
+test("chat rejects malformed native tools, tool calls, and tool result messages before model invocation", async () => {
+  let completeChatCalls = 0;
+
+  const gateway = createGatewayController({
+    modelService: {
+      async listModels() {
+        return [];
+      },
+      async completeChat() {
+        completeChatCalls += 1;
+        return "should-not-run";
+      },
+    },
+  });
+
+  await gateway.start();
+
+  try {
+    const validTool = { name: "get_stock_data", description: "Fetch data.", inputSchema: {} };
+    const validAssistantToolCall = {
+      role: "assistant",
+      content: "",
+      toolCalls: [{ id: "call_1", name: "get_stock_data", input: {} }],
+    };
+
+    const invalidBodies = [
+      { ...buildChatBody(), tools: [] },
+      { ...buildChatBody(), tools: [null] },
+      { ...buildChatBody(), tools: [{ ...validTool, name: " " }] },
+      { ...buildChatBody(), tools: [{ ...validTool, description: 1 }] },
+      { ...buildChatBody(), tools: [{ ...validTool, inputSchema: [] }] },
+      { ...buildChatBody(), tools: [{ ...validTool, type: "function" }] },
+      { ...buildChatBody(), tools: [{ ...validTool, function: {} }] },
+      { ...buildChatBody(), tools: [{ ...validTool, parameters: {} }] },
+      { model: "model-alpha", messages: [{ ...validAssistantToolCall, toolCalls: [] }] },
+      {
+        model: "model-alpha",
+        messages: [
+          {
+            ...validAssistantToolCall,
+            toolCalls: [{ id: " ", name: "get_stock_data", input: {} }],
+          },
+        ],
+      },
+      {
+        model: "model-alpha",
+        messages: [
+          {
+            ...validAssistantToolCall,
+            toolCalls: [{ id: "call_1", name: " ", input: {} }],
+          },
+        ],
+      },
+      {
+        model: "model-alpha",
+        messages: [
+          {
+            ...validAssistantToolCall,
+            toolCalls: [{ id: "call_1", name: "get_stock_data", input: [] }],
+          },
+        ],
+      },
+      { model: "model-alpha", messages: [{ role: "tool", toolCallId: " ", content: "result" }] },
+      { model: "model-alpha", messages: [{ role: "tool", toolCallId: "call_1", content: 123 }] },
+      {
+        model: "model-alpha",
+        messages: [{ role: "tool", toolCallId: "call_1", content: "result", toolCalls: [] }],
+      },
+    ];
+
+    for (const invalidBody of invalidBodies) {
+      const response = await postChat(gateway, invalidBody);
+      assert.equal(response.status, 400);
+      assert.equal((await response.json()).error.code, "validation_error");
+    }
+
+    assert.equal(completeChatCalls, 0);
+  } finally {
+    await gateway.stop("command");
+  }
+});
+
+test("chat rejects OpenAI-style tool context field names", async () => {
+  let completeChatCalls = 0;
+
+  const gateway = createGatewayController({
+    modelService: {
+      async listModels() {
+        return [];
+      },
+      async completeChat() {
+        completeChatCalls += 1;
+        return "should-not-run";
+      },
+    },
+  });
+
+  await gateway.start();
+
+  try {
+    const invalidBodies = [
+      {
+        model: "model-alpha",
+        messages: [{ role: "assistant", content: "", tool_calls: [] }],
+      },
+      {
+        model: "model-alpha",
+        messages: [{ role: "tool", tool_call_id: "call_1", content: "result" }],
+      },
+      {
+        model: "model-alpha",
+        messages: [{ role: "assistant", content: "", function: { name: "tool" } }],
+      },
+      {
+        model: "model-alpha",
+        messages: [{ role: "assistant", content: "", arguments: "{}" }],
+      },
+      {
+        model: "model-alpha",
+        messages: [{ role: "user", content: "Hello" }],
+        tools: [{ type: "function", function: { name: "get_stock_data", parameters: {} } }],
+      },
+    ];
+
+    for (const invalidBody of invalidBodies) {
+      const response = await postChat(gateway, invalidBody);
+      assert.equal(response.status, 400);
+      assert.equal((await response.json()).error.code, "validation_error");
+    }
+
+    const nativeJsonSchemaType = await postChat(gateway, {
+      model: "model-alpha",
+      messages: [{ role: "user", content: "Hello" }],
+      tools: [{ name: "get_stock_data", description: "", inputSchema: { type: "object" } }],
+    });
+    assert.equal(nativeJsonSchemaType.status, 200);
+
+    assert.equal(completeChatCalls, 1);
   } finally {
     await gateway.stop("command");
   }
@@ -400,24 +635,7 @@ test("chat resolves model by exact ID, uses raw model sendRequest, and assembles
         ];
       },
     },
-    {
-      createUserMessage(content) {
-        return { role: "user", content };
-      },
-      createAssistantMessage(content) {
-        return { role: "assistant", content };
-      },
-      createCancellationSource() {
-        const controller = new AbortController();
-        return {
-          token: controller.signal,
-          cancel() {
-            controller.abort();
-          },
-          dispose() {},
-        };
-      },
-    }
+    createTestRuntime()
   );
 
   const gateway = createGatewayController({ modelService: fakeModelService });
@@ -484,6 +702,137 @@ test("chat resolves model by exact ID, uses raw model sendRequest, and assembles
     });
     assert.equal(missingModel.status, 404);
     assert.equal((await missingModel.json()).error.code, "model_not_found");
+  } finally {
+    await gateway.stop("command");
+  }
+});
+
+test("model service passes native tools and returns response tool calls without executing them", async () => {
+  const selectedMessages = [];
+  const selectedOptions = [];
+  let sendRequestCalls = 0;
+
+  const fakeModelService = createVsCodeModelService(
+    {
+      async selectChatModels(selector) {
+        assert.deepEqual(selector, {});
+        return [
+          {
+            id: "model-alpha",
+            name: "Model Alpha",
+            async sendRequest(messages, options) {
+              sendRequestCalls += 1;
+              selectedMessages.push(messages);
+              selectedOptions.push(options);
+              return {
+                text: (async function* createUnusedTextChunks() {
+                  yield "ignored text fallback";
+                })(),
+                stream: (async function* createResponseParts() {
+                  yield { kind: "text", value: "" };
+                  yield {
+                    kind: "toolCall",
+                    id: "call_1",
+                    name: "get_stock_data",
+                    input: { ticker: "MSFT" },
+                  };
+                })(),
+              };
+            },
+          },
+        ];
+      },
+    },
+    createTestRuntime()
+  );
+
+  const completion = await fakeModelService.completeChat(
+    {
+      model: "model-alpha",
+      messages: [
+        { role: "user", content: "Need data." },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [{ id: "call_previous", name: "lookup", input: { ticker: "AAPL" } }],
+        },
+        { role: "tool", toolCallId: "call_previous", content: "previous result" },
+      ],
+      tools: [
+        {
+          name: "get_stock_data",
+          description: "Fetch stock data.",
+          inputSchema: { type: "object", properties: { ticker: { type: "string" } } },
+        },
+      ],
+    },
+    new AbortController().signal
+  );
+
+  assert.equal(sendRequestCalls, 1);
+  assert.deepEqual(selectedMessages, [
+    [
+      { role: "user", content: "Need data." },
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [{ id: "call_previous", name: "lookup", input: { ticker: "AAPL" } }],
+      },
+      { role: "user", toolResult: { toolCallId: "call_previous", content: "previous result" } },
+    ],
+  ]);
+  assert.deepEqual(selectedOptions, [
+    {
+      tools: [
+        {
+          name: "get_stock_data",
+          description: "Fetch stock data.",
+          inputSchema: { type: "object", properties: { ticker: { type: "string" } } },
+        },
+      ],
+    },
+  ]);
+  assert.deepEqual(completion, {
+    message: {
+      role: "assistant",
+      content: "",
+      toolCalls: [{ id: "call_1", name: "get_stock_data", input: { ticker: "MSFT" } }],
+    },
+  });
+});
+
+test("chat response uses toolCalls finish reason when native tool calls are returned", async () => {
+  const gateway = createGatewayController({
+    modelService: {
+      async listModels() {
+        return [];
+      },
+      async completeChat() {
+        return {
+          message: {
+            role: "assistant",
+            content: "",
+            toolCalls: [{ id: "call_1", name: "get_stock_data", input: { ticker: "MSFT" } }],
+          },
+        };
+      },
+    },
+  });
+
+  await gateway.start();
+
+  try {
+    const response = await postChat(gateway, buildChatBody());
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.deepEqual(body.message, {
+      role: "assistant",
+      content: "",
+      toolCalls: [{ id: "call_1", name: "get_stock_data", input: { ticker: "MSFT" } }],
+    });
+    assert.equal(body.finishReason, "toolCalls");
+    assert.equal(body.usage, null);
+    assert.deepEqual(body.metadata, {});
   } finally {
     await gateway.stop("command");
   }
@@ -732,24 +1081,7 @@ test("gateway stop during model selection cancels before sendRequest", async () 
         return pendingSelection;
       },
     },
-    {
-      createUserMessage(content) {
-        return { role: "user", content };
-      },
-      createAssistantMessage(content) {
-        return { role: "assistant", content };
-      },
-      createCancellationSource() {
-        const controller = new AbortController();
-        return {
-          token: controller.signal,
-          cancel() {
-            controller.abort();
-          },
-          dispose() {},
-        };
-      },
-    }
+    createTestRuntime()
   );
 
   const gateway = createGatewayController({ modelService: fakeModelService });

@@ -8,8 +8,8 @@ from typing import Literal, TypeAlias
 
 from .errors import GatewayErrorPayload
 
-ChatRole: TypeAlias = Literal["system", "user", "assistant"]
-FinishReason: TypeAlias = Literal["stop"]
+ChatRole: TypeAlias = Literal["system", "user", "assistant", "tool"]
+FinishReason: TypeAlias = Literal["stop", "toolCalls"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,9 +42,25 @@ class GatewayModel:
 
 
 @dataclass(frozen=True, slots=True)
+class GatewayTool:
+    name: str
+    description: str = ""
+    input_schema: Mapping[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class GatewayToolCall:
+    id: str
+    name: str
+    input: Mapping[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
 class ChatMessage:
     role: ChatRole
     content: str
+    tool_calls: Sequence[GatewayToolCall] = ()
+    tool_call_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +69,7 @@ class ChatRequest:
     messages: Sequence[ChatMessage]
     request_id: str | None = None
     metadata: Mapping[str, object] = field(default_factory=dict)
+    tools: Sequence[GatewayTool] = ()
 
 
 @dataclass(frozen=True, slots=True)
