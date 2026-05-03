@@ -1,6 +1,6 @@
 # TradingAgents VS Code Provider Smoke
 
-Purpose: verify the TradingAgents `vscode` provider boundary can construct a gateway-backed LangChain model, optionally make one direct chat call through a running VS Code gateway, and document the P3.3c full-graph harness command. P3.3b adds mocked non-streaming native tool-call roundtrip support through the gateway, SDK, and LangChain adapter; neither the direct provider smoke nor the harness documentation is live P3.3c proof until the full-graph command exits successfully against a real gateway/model.
+Purpose: verify the TradingAgents `vscode` provider boundary can construct a gateway-backed LangChain model, optionally make one direct chat call through a running VS Code gateway, and provide the P3.3c full-graph harness command. P3.3b adds mocked non-streaming native tool-call roundtrip support through the gateway, SDK, and LangChain adapter; P3.3c live proof passed once the full-graph command exited successfully against a real gateway/model.
 
 ## Prerequisites
 
@@ -63,7 +63,7 @@ The script reads `TRADINGAGENTS_VSCODE_GATEWAY_URL` and `TRADINGAGENTS_VSCODE_GA
 
 ## Run The Full-Graph Harness For P3.3c
 
-This is the command path for P3.3c live proof. The harness is repeatable, but P3.3c remains unproven until this command exits successfully against a real running VS Code gateway and model.
+This is the repeatable command path for P3.3c live proof.
 
 Minimal one-analyst run using the default ticker, date, and one debate/risk round:
 
@@ -86,7 +86,7 @@ Both `--max-debate-rounds` and `--max-risk-discuss-rounds` must be integers `>= 
 
 P3.3b supports mocked non-streaming `prompt | llm.bind_tools(tools)` roundtrips: the gateway can return native assistant `toolCalls`, the Python SDK/LangChain adapter can expose them as LangChain `AIMessage.tool_calls`, and a local LangGraph `ToolNode` can send tool results back as native `role: "tool"` messages on the next non-stream turn.
 
-A live full one-ticker TradingAgents analyst graph smoke remains P3.3c until the full-graph harness is actually run against a VS Code model and gateway and exits successfully. The direct provider smoke validates provider construction and an optional direct LangChain `invoke()` call; the full-graph harness prepares the live proof command, but harness existence alone does not prove Research Manager, Trader, Portfolio Manager, or full analyst graph execution through VS Code models.
+P3.3c live proof passed on 2026-05-02 with a running VS Code gateway and model `claude-opus-4.6-1m`. The direct provider smoke validated provider construction and a direct LangChain `invoke()` call, and the full-graph harness validated a market-only `NVDA` run through Research Manager, Trader, and Portfolio Manager. Those downstream nodes used documented free-text fallback because `with_structured_output(...)` remains unsupported by the native gateway adapter.
 
 ## Cleanup
 

@@ -15,12 +15,12 @@ This file owns medium-term governance priorities and parked work. Product-specif
 - Treat P3.2 thin TradingAgents `vscode` provider boundary as complete and review-approved.
 - Treat P3.3a direct TradingAgents `vscode` provider smoke/runbook as complete and review-approved.
 - Treat P3.3b mocked non-stream native tool-call roundtrip as complete and review-approved.
-- Treat P3.3c full-graph smoke harness readiness as complete and review-approved, but not live proof.
+- Treat P3.3c full-graph smoke harness readiness and live full-graph smoke proof as complete.
 
 ## Next
 
 - Keep using the phase execution queue in `docs/planning/codex-task-packets.md` for handoffs.
-- Run and record P3.3c live full one-ticker TradingAgents smoke through VS Code models using the full-graph harness.
+- Plan the next `vscode` provider slice: structured-output compatibility or explicit free-text fallback acceptance criteria for downstream decision nodes.
 
 ## Later
 

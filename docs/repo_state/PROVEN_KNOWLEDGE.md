@@ -43,6 +43,7 @@
 - `scripts/smoke_vscode_provider.py` is a direct TradingAgents `vscode` provider smoke: it validates `TRADINGAGENTS_VSCODE_GATEWAY_URL`, `TRADINGAGENTS_VSCODE_GATEWAY_TOKEN`, model, and prompt values; supports `--no-invoke`; can call `GatewayChatModel.invoke()` directly; and redacts the configured token from failure and assistant-output text.
 - `docs/runbooks/tradingagents-vscode-provider.md` owns the operator steps for the direct provider smoke and the P3.3c full-graph harness; it explicitly does not prove a full analyst graph run until the harness succeeds against a real gateway/model.
 - `scripts/smoke_vscode_tradingagents_graph.py` is the repeatable P3.3c full-graph harness: it validates the gateway environment, opaque model ID, ticker, ISO trade date, analysts, output root, and round counts; builds an isolated `vscode` graph config; runs `TradingAgentsGraph(...).propagate(...)`; requires selected analyst reports plus downstream decision fields to be nonblank; and prints only token-redacted concise evidence and field character counts.
+- On 2026-05-02, P3.3c live full-graph smoke passed through a running VS Code gateway using model `claude-opus-4.6-1m`: direct provider construction and direct invoke passed, then `scripts/smoke_vscode_tradingagents_graph.py --model claude-opus-4.6-1m` completed for `NVDA` on `2024-05-10` with market analyst selected, processed decision `Hold`, and nonblank `market_report`, `investment_plan`, `trader_investment_plan`, and `final_trade_decision` evidence. Research Manager, Trader, and Portfolio Manager used the documented free-text fallback because structured output remains unsupported.
 
 ## Reopen Rules
 
@@ -54,7 +55,7 @@
 - Reopen document ownership if duplicate current-truth stores appear.
 - Reopen gateway stability facts if future live VS Code model smoke fails or if stable VS Code LM API behavior differs from the tested assumptions.
 - Reopen SDK facts if provider integration changes adapter behavior, package metadata, public import names, token redaction behavior, streaming behavior, structured-output/tool-calling support, native tool contract shape, or the no-OpenAI-facade boundary.
-- Reopen `vscode` provider facts if environment variable names, optional dependency policy, CLI selection behavior, factory dispatch, direct smoke behavior, graph smoke harness behavior, runbook setup, or `bind_tools()` support changes.
+- Reopen `vscode` provider facts if environment variable names, optional dependency policy, CLI selection behavior, factory dispatch, direct smoke behavior, graph smoke harness behavior, live proof behavior, runbook setup, structured-output fallback behavior, or `bind_tools()` support changes.
 
 ## Superseded Or Contested Knowledge
 

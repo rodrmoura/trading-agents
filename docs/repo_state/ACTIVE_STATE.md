@@ -7,11 +7,11 @@
 - Python environment setup is repaired, upgraded, and validated; `requirements.txt` is a documented compatibility/test-install shim and `uv.lock` is refreshed to current `pyproject.toml` metadata.
 - VS Code gateway package implementation packets P1.1 through P1.5 in `packages/vscode-llm-gateway` are implemented and review-approved this session.
 - G1 live VS Code extension smoke with a real VS Code model passed and is accepted.
-- Phase 2 P2.1 through P2.4 are implemented, verified, and review-approved; P3.1 TradingAgents provider integration audit, P3.2 thin `vscode` provider boundary, P3.3a direct provider smoke/runbook slice, P3.3b mocked non-stream native tool-call roundtrip, and P3.3c full-graph smoke harness readiness are complete.
+- Phase 2 P2.1 through P2.4 are implemented, verified, and review-approved; P3.1 TradingAgents provider integration audit, P3.2 thin `vscode` provider boundary, P3.3a direct provider smoke/runbook slice, P3.3b mocked non-stream native tool-call roundtrip, P3.3c full-graph smoke harness readiness, and P3.3c live full-graph smoke proof are complete.
 
 ## Current Mode
 
-- P3.3c full-graph smoke harness readiness is complete; the next target is live execution against a running VS Code gateway/model.
+- P3.3c live full-graph smoke proof is complete; the next target is structured-output compatibility or accepted free-text fallback hardening for the `vscode` provider path.
 - Local workspace path cleanup is complete: the repository has been reopened at `C:\VSCode\Tauric\TradingAgents`, hardcoded project text references now use the no-space path, and the repo-local `.venv` was rebuilt at the new path.
 - G0 has been committed and pushed to `origin/main` as `10a4a5d`.
 
@@ -67,17 +67,17 @@
 - P3.3b native non-stream tool-call roundtrip is implemented and review-approved: the VS Code gateway accepts native `tools`, assistant `toolCalls`, and `role: "tool"` messages for `/v1/chat/completions`; rejects OpenAI-shaped tool fields; keeps `/v1/chat/completions/stream` text-only; the Python SDK serializes/parses the native tool contract; and `GatewayChatModel.bind_tools()` returns a bound clone that maps LangChain tools, `AIMessage.tool_calls`, and `ToolMessage` values to the native gateway contract.
 - P3.3b verification passed: VS Code gateway `npm run check`, `npm run compile`, and `npm test --if-present` (`48` tests); SDK package tests (`89 passed`); targeted TradingAgents provider/structured tests (`37 passed, 37 subtests passed`); full root pytest (`115 passed, 40 subtests passed`); diagnostics on scoped files; and PhD Critic implementation review approved with no blocking findings. `git diff --check` reported only Git's line-ending warning for `docs/reference/gateway-api-draft.md`, not whitespace errors. No live VS Code model tool-call run or full one-ticker TradingAgents smoke was run for P3.3b.
 - P3.3c harness readiness is implemented and review-approved: `scripts/smoke_vscode_tradingagents_graph.py` validates gateway env, model, ticker, ISO trade date, analyst list, output root, and round counts; builds an isolated `vscode` `TradingAgentsGraph` config; runs `propagate(ticker, trade_date)`; checks selected analyst reports plus `investment_plan`, `trader_investment_plan`, `final_trade_decision`, and processed decision; and prints token-redacted concise evidence with field character counts instead of report bodies.
-- P3.3c harness readiness verification passed: focused provider/harness tests (`50 passed`), full root pytest (`142 passed, 40 subtests passed`), VS Code gateway package `npm run check`, `npm run compile`, and `npm test --if-present` (`48` tests), SDK package tests (`89 passed`), diagnostics on touched files, scoped `git diff --check`, and PhD Critic implementation review approved with no blocking findings. Full `git diff --check` still reports only Git's existing LF-to-CRLF warning for `docs/reference/gateway-api-draft.md`. No live P3.3c full-graph smoke was run because no gateway env values were configured and localhost scans found no gateway `/health` endpoint.
+- P3.3c harness readiness verification passed: focused provider/harness tests (`50 passed`), full root pytest (`142 passed, 40 subtests passed`), VS Code gateway package `npm run check`, `npm run compile`, and `npm test --if-present` (`48` tests), SDK package tests (`89 passed`), diagnostics on touched files, scoped `git diff --check`, and PhD Critic implementation review approved with no blocking findings. Full `git diff --check` still reports only Git's existing LF-to-CRLF warning for `docs/reference/gateway-api-draft.md`.
+- P3.3c live full-graph smoke passed on 2026-05-02 through the Extension Development Host gateway at `127.0.0.1:54593` with `56` listed models and selected model `claude-opus-4.6-1m`. Direct provider construction and direct `llm.invoke(...)` smoke passed. Full graph command `scripts/smoke_vscode_tradingagents_graph.py --model claude-opus-4.6-1m` passed for `NVDA` on `2024-05-10` with analyst `market`, processed decision `Hold`, field counts `market_report=4401`, `investment_plan=1497`, `trader_investment_plan=480`, `final_trade_decision=1117`, and output root `C:\Users\Rodrigo\AppData\Local\Temp\tradingagents-vscode-graph-smoke-xfw285h3`. Research Manager, Trader, and Portfolio Manager used the documented free-text fallback because `with_structured_output(...)` is still unsupported by `llm_gateway`.
 
 ## Known Blockers
 
-- A live full `vscode` provider TradingAgents one-ticker run remains unproven until it is executed against a running VS Code gateway/model.
-- Current terminal has no `TRADINGAGENTS_VSCODE_GATEWAY_URL` or `TRADINGAGENTS_VSCODE_GATEWAY_TOKEN`; localhost gateway scans during this session found no public gateway `/health` endpoint.
+- Structured output remains unsupported by `llm_gateway`; manager/trader/portfolio nodes currently use free-text fallback on the `vscode` provider path.
 
 ## Next Actions
 
-- Start the VS Code gateway from an Extension Development Host, copy the gateway token, set `TRADINGAGENTS_VSCODE_GATEWAY_URL` and `TRADINGAGENTS_VSCODE_GATEWAY_TOKEN`, list `/v1/models`, then run `scripts/smoke_vscode_tradingagents_graph.py --model <model-id>`.
-- Do not claim full analyst smoke support until the P3.3c full-graph harness exits successfully against a real gateway/model and the evidence is recorded.
+- Plan the next `vscode` provider slice: structured-output compatibility or explicit free-text fallback acceptance criteria for Research Manager, Trader, Portfolio Manager, and signal processing.
+- If continuing live validation, prefer a faster model than `claude-opus-4.6-1m` for routine smoke loops; the successful P3.3c run proves the path but was slow near final manager/trader/portfolio phases.
 
 ## Resume Pointers
 

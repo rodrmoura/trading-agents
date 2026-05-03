@@ -43,7 +43,7 @@ Use this table as the planning index. The detailed packet sections below remain 
 | 3 | P3.2 | Add thin `vscode` provider boundary | P3.1 and SDK adapter | Completed this session; implementation and review approved |
 | 3 | P3.3a | Add direct provider smoke script and runbook | P3.2 | Completed this session; implementation and review approved |
 | 3 | P3.3b | Implement native non-stream tool-call roundtrip | P3.3a | Completed this session; implementation and review approved |
-| 3 | P3.3c | Prove live one-ticker TradingAgents smoke path | P3.3b plus running VS Code gateway/model | Planned |
+| 3 | P3.3c | Prove live one-ticker TradingAgents smoke path | P3.3b plus running VS Code gateway/model | Completed this session; live proof passed with free-text structured-output fallback |
 | 4 | P4.1 | Formalize agent and workflow schemas | G3 passed | Planned |
 | 4 | P4.2 | Define tool, event, artifact, memory, and checkpoint contracts | P4.1 | Planned |
 | 4 | P4.3 | Create product strategy review example | P4.1/P4.2 | Planned |
@@ -1155,7 +1155,7 @@ Validation:
 
 ### P3.3c Prove Live One-Ticker TradingAgents Smoke Path
 
-Status: planned; harness readiness is not live proof.
+Status: completed this session; harness readiness and live proof passed. Downstream structured-output support remains future work because the live proof used the documented free-text fallback.
 
 Model: Codex coding model extra-high.
 
@@ -1186,6 +1186,15 @@ Acceptance criteria:
 - Live proof: Research Manager, Trader, and Portfolio Manager coverage is proven or any accepted fallback/degraded structured-output behavior is explicitly recorded.
 - Live proof: token handling and gateway model IDs remain opaque and secret-safe.
 - P3.3c must not be marked completed from mocked harness tests alone.
+
+Completion evidence:
+
+- Live gateway: `127.0.0.1:54593`, gateway `0.0.1`, `56` listed models.
+- Selected model: `claude-opus-4.6-1m`.
+- Direct provider construction and direct invoke smoke both passed.
+- Full graph: `NVDA`, `2024-05-10`, analyst `market`, processed decision `Hold`.
+- Checked field counts: `market_report=4401`, `investment_plan=1497`, `trader_investment_plan=480`, `final_trade_decision=1117`.
+- Research Manager, Trader, and Portfolio Manager used the documented free-text fallback because `with_structured_output(...)` remains unsupported by `llm_gateway`.
 
 Validation:
 

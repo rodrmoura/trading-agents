@@ -47,7 +47,7 @@ Active backlog for the Tauric VS Code LLM integration and generalized agent coll
 - [x] Create a LangChain-compatible adapter.
 - [x] Pass G2 Python SDK and adapter gate.
 - [x] Add a thin TradingAgents `vscode` LLM provider.
-- [ ] Prove Research Manager, Trader, and Portfolio Manager through VS Code models.
+- [x] Prove Research Manager, Trader, and Portfolio Manager through VS Code models.
 - [ ] Add structured-output compatibility.
 - [x] Add non-stream native tool-call roundtrip compatibility for analyst agents.
 
@@ -88,7 +88,7 @@ Active backlog for the Tauric VS Code LLM integration and generalized agent coll
 - [x] P3.3a Prepare operator runbook/direct provider smoke path without claiming full analyst support before tool calling is resolved.
 - [x] P3.3b Implement mocked non-stream native tool-call roundtrip support.
 - [x] P3.3c Prepare full-graph smoke harness without claiming live proof.
-- [ ] P3.3c Run and record live full one-ticker TradingAgents smoke through VS Code models.
+- [x] P3.3c Run and record live full one-ticker TradingAgents smoke through VS Code models.
 
 ## Open Questions
 
